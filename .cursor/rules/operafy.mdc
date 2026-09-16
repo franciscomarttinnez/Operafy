@@ -1,0 +1,374 @@
+---
+description: Core development rules for Operafy (solo junior scope)
+alwaysApply: true
+---
+
+# Operafy Development Rules
+
+Operafy is a **solo junior / student portfolio SaaS**.  
+Prefer clear, finishable code over enterprise architecture.
+
+---
+
+## 1. Source of Truth
+
+Before implementing any feature:
+
+1. Read `PRODUCT_BRIEF.md`.
+2. Inspect existing code and reuse patterns.
+3. Implement the smallest change that completes the request.
+
+Do not contradict `PRODUCT_BRIEF.md` unless the user explicitly changes scope.
+
+If a requested feature is out of MVP scope, say so and ask before building it.
+
+---
+
+## 2. Scope Discipline
+
+MVP core loop only:
+
+**Auth → Organization → Customers → Quotes → Work Orders → Payments → Simple Dashboard**
+
+Do not build (unless the user explicitly expands scope):
+
+- multi-org switching / invites / team roles
+- inventory / materials catalog
+- public quote links
+- notifications / email automation
+- reports / charts
+- global search
+- activity/audit log systems
+- custom backends beyond Supabase
+
+When unsure, choose the simpler option that still looks professional.
+
+---
+
+## 3. Engineering Principles
+
+Write code another junior could maintain.
+
+Prioritize:
+
+- correctness
+- readability
+- type safety
+- tenant safety
+- simple structure
+
+Avoid:
+
+- premature abstractions
+- deep folder gymnastics
+- unnecessary libraries
+- clever patterns that hide the workflow
+
+---
+
+## 4. TypeScript
+
+Strict mode is mandatory.
+
+Never use:
+
+- `any`
+- `@ts-ignore`
+- `@ts-nocheck`
+
+Avoid unnecessary type assertions.
+
+Prefer types generated from Supabase where practical.
+
+---
+
+## 5. React
+
+Functional components only.
+
+Keep components focused. When a screen grows, split into:
+
+- page/container
+- presentational pieces
+- hooks for data
+- small domain helpers for business rules
+
+Do not use `useEffect` for derived state.
+
+Prefer event handlers and TanStack Query over ad-hoc effect chains.
+
+---
+
+## 6. Data Fetching
+
+Use TanStack Query for server state.
+
+- stable query keys
+- loading / error states
+- invalidate related queries after mutations
+
+Do not invent a custom cache layer.
+
+---
+
+## 7. Database
+
+PostgreSQL (Supabase) is the source of truth.
+
+- relational modeling
+- `organization_id` on organization-owned tables
+- foreign keys
+- timestamps
+- constraints for integrity where easy
+
+MVP tenancy model:
+
+- one user ↔ one organization (owner)
+- no membership/roles matrix unless scope expands later
+
+---
+
+## 8. Multi-Tenancy (critical)
+
+Every org-owned query must be tenant-safe.
+
+Never trust URL params or client-provided org IDs for authorization.
+
+Enforce access with **Supabase RLS**.
+
+Before calling a feature done, confirm org A cannot read org B data.
+
+---
+
+## 9. Authentication
+
+Use Supabase Auth.
+
+- no custom password storage
+- no service-role key in the browser
+- secrets only in env vars
+
+---
+
+## 10. Money
+
+Money is business-critical even in a junior project.
+
+- store amounts as integer minor units (`$205.50` → `20550`)
+- never use floating-point for totals
+- centralize quote total and payment balance helpers
+- validate amounts with Zod (and DB constraints where useful)
+
+---
+
+## 11. Business Logic
+
+Keep important rules out of JSX:
+
+- quote totals
+- payment balances
+- status transitions
+
+Small pure functions in `src/lib` or feature folders are enough.  
+Do not invent a heavy domain-layer framework.
+
+---
+
+## 12. Forms
+
+Use a consistent approach (React Hook Form + Zod is preferred once added).
+
+Forms should:
+
+- validate input
+- show field errors
+- disable double submit
+- show saving state
+
+---
+
+## 13. UI
+
+Use the project design system (Tailwind + shadcn/ui).
+
+Reuse existing components before creating new ones.
+
+Keep screens consistent: spacing, buttons, tables, dialogs, empty/loading/error states.
+
+---
+
+## 14. UX Baseline
+
+Every page must handle loading, empty, success, and error.
+
+Empty states should suggest the next action.
+
+Confirm destructive actions.
+
+Mobile must be usable for lists and job status updates — not a shrunk desktop clone.
+
+---
+
+## 15. Accessibility
+
+Use semantic HTML, labels, keyboard access, and visible focus.
+
+Prefer Radix/shadcn defaults.  
+Do not turn the project into an accessibility certification effort.
+
+---
+
+## 16. Errors & Loading
+
+Never swallow errors with empty `catch` blocks.
+
+Show a clear user message; keep technical detail in logs/console during development.
+
+Async buttons should show progress (`Save` → `Saving...`).
+
+---
+
+## 17. Routing
+
+Keep routes business-shaped and predictable:
+
+- `/dashboard`
+- `/customers`
+- `/customers/:customerId`
+- `/quotes`
+- `/quotes/new`
+- `/quotes/:quoteId`
+- `/work-orders`
+- `/work-orders/:workOrderId`
+- `/payments`
+
+---
+
+## 18. Project Structure
+
+Organize by feature, lightly:
+
+```text
+src/
+  components/     # shared UI
+  features/
+    auth/
+    customers/
+    quotes/
+    work-orders/
+    payments/
+    dashboard/
+  lib/            # supabase client, money, status helpers
+  hooks/
+  types/
+```
+
+Do not create large generic `utils` dumping grounds.
+
+A thin service module per feature is enough:
+
+`UI → hook/query → service (Supabase calls) → DB`
+
+---
+
+## 19. Validation
+
+Use Zod (or the schema library already in the project).
+
+Validate user input, IDs, money, quantities, and status changes.
+
+---
+
+## 20. Status Machines
+
+Statuses have explicit allowed transitions.
+
+Encode transitions in a small helper function.
+
+Do not allow nonsense transitions (e.g. completed → draft) unless product rules say so.
+
+---
+
+## 21. Testing
+
+Before finishing business-critical pieces:
+
+- TypeScript check
+- lint
+- relevant unit tests
+
+Test priority:
+
+1. quote totals
+2. payment balances
+3. status transitions
+
+Skip shallow tests written only for coverage.
+
+---
+
+## 22. Dependencies
+
+Add a library only when it clearly saves time or prevents bugs.
+
+Default stack is enough for MVP. Ask before adding large new tools.
+
+---
+
+## 23. Anti-Overengineering
+
+Do not build:
+
+- microservices
+- event buses
+- complex global state
+- DDD ceremony
+- premature optimization
+- speculative “future-proof” tables for out-of-scope features
+
+Goal: a **small modular monolith** that a junior can explain in an interview.
+
+---
+
+## 24. Security Checklist
+
+For auth, customer data, payments, and uploads (if any):
+
+- RLS policies
+- input validation
+- no secret leakage
+- safe error messages
+- no cross-tenant access
+
+---
+
+## 25. Agent Behavior
+
+When implementing:
+
+1. Understand existing code + brief  
+2. State a short plan (files, data, UI, risks)  
+3. Implement the smallest coherent slice  
+4. Validate (types/lint/tests as relevant)  
+5. Report what changed and what remains  
+
+Do not claim something works without validation.
+
+If a request conflicts with solo-junior scope, warn and propose the simpler alternative.
+
+---
+
+## 26. Portfolio Quality
+
+Write as if a recruiter may read the repo.
+
+Prioritize:
+
+- coherent workflow demo
+- clear naming
+- honest README
+- strong typing
+- correct money + tenancy
+- clean UX on the main paths
+
+Optimize for **finished quality**, not feature count.
