@@ -5,6 +5,7 @@ import {
   deleteWorkOrder,
   getWorkOrder,
   getWorkOrderForQuote,
+  listAllWorkOrders,
   listWorkOrders,
   listWorkOrdersForCustomer,
   setWorkOrderStatus,
@@ -19,6 +20,8 @@ import { useOrganization } from '@/features/organizations/use-organization'
 
 export const workOrdersQueryKey = (organizationId: string) =>
   ['work-orders', organizationId] as const
+export const allWorkOrdersQueryKey = (organizationId: string) =>
+  ['all-work-orders', organizationId] as const
 export const workOrderQueryKey = (organizationId: string, workOrderId: string) =>
   ['work-order', organizationId, workOrderId] as const
 export const customerWorkOrdersQueryKey = (organizationId: string, customerId: string) =>
@@ -37,6 +40,27 @@ export function useWorkOrders() {
         return []
       }
       return listWorkOrders(organizationId)
+    },
+    enabled: hasOrganization && Boolean(organizationId),
+  })
+}
+
+/**
+ * Fetches the complete list of work orders for the organization (no 50-row
+ * cap). Use this for KPI/aggregate calculations (e.g. dashboard, payment
+ * balances) rather than `useWorkOrders`, whose list is capped for display.
+ */
+export function useAllWorkOrders() {
+  const { organization, hasOrganization } = useOrganization()
+  const organizationId = organization?.id
+
+  return useQuery({
+    queryKey: allWorkOrdersQueryKey(organizationId ?? 'none'),
+    queryFn: async () => {
+      if (!organizationId) {
+        return []
+      }
+      return listAllWorkOrders(organizationId)
     },
     enabled: hasOrganization && Boolean(organizationId),
   })
@@ -95,6 +119,7 @@ async function invalidateWorkOrderQueries(
 ) {
   await Promise.all([
     queryClient.invalidateQueries({ queryKey: ['work-orders'] }),
+    queryClient.invalidateQueries({ queryKey: ['all-work-orders'] }),
     queryClient.invalidateQueries({ queryKey: ['work-order'] }),
     queryClient.invalidateQueries({ queryKey: ['customer-work-orders'] }),
     queryClient.invalidateQueries({ queryKey: ['quote-work-order'] }),

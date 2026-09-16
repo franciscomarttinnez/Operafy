@@ -3,6 +3,7 @@ import {
   createQuote,
   deleteQuote,
   getQuoteDetail,
+  listAllQuotes,
   listQuotes,
   listQuotesForCustomer,
   setQuoteStatus,
@@ -13,6 +14,8 @@ import type { QuoteStatus } from '@/features/quotes/quote-status'
 import { useOrganization } from '@/features/organizations/use-organization'
 
 export const quotesQueryKey = (organizationId: string) => ['quotes', organizationId] as const
+export const allQuotesQueryKey = (organizationId: string) =>
+  ['all-quotes', organizationId] as const
 export const quoteQueryKey = (organizationId: string, quoteId: string) =>
   ['quote', organizationId, quoteId] as const
 export const customerQuotesQueryKey = (organizationId: string, customerId: string) =>
@@ -29,6 +32,27 @@ export function useQuotes() {
         return []
       }
       return listQuotes(organizationId)
+    },
+    enabled: hasOrganization && Boolean(organizationId),
+  })
+}
+
+/**
+ * Fetches the complete list of quotes for the organization (no 50-row cap).
+ * Use this for KPI/aggregate calculations (e.g. dashboard) rather than
+ * `useQuotes`, whose list is capped for display performance.
+ */
+export function useAllQuotes() {
+  const { organization, hasOrganization } = useOrganization()
+  const organizationId = organization?.id
+
+  return useQuery({
+    queryKey: allQuotesQueryKey(organizationId ?? 'none'),
+    queryFn: async () => {
+      if (!organizationId) {
+        return []
+      }
+      return listAllQuotes(organizationId)
     },
     enabled: hasOrganization && Boolean(organizationId),
   })
@@ -66,13 +90,21 @@ export function useCustomerQuotes(customerId: string | undefined) {
   })
 }
 
+async function invalidateQuoteQueries(queryClient: ReturnType<typeof useQueryClient>) {
+  await Promise.all([
+    queryClient.invalidateQueries({ queryKey: ['quotes'] }),
+    queryClient.invalidateQueries({ queryKey: ['all-quotes'] }),
+    queryClient.invalidateQueries({ queryKey: ['quote'] }),
+    queryClient.invalidateQueries({ queryKey: ['customer-quotes'] }),
+  ])
+}
+
 export function useCreateQuote() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async (input: QuoteWriteInput) => createQuote(input),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['quotes'] })
-      await queryClient.invalidateQueries({ queryKey: ['customer-quotes'] })
+      await invalidateQuoteQueries(queryClient)
     },
   })
 }
@@ -82,9 +114,7 @@ export function useUpdateQuote(quoteId: string) {
   return useMutation({
     mutationFn: async (input: QuoteWriteInput) => updateQuote(quoteId, input),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['quotes'] })
-      await queryClient.invalidateQueries({ queryKey: ['quote'] })
-      await queryClient.invalidateQueries({ queryKey: ['customer-quotes'] })
+      await invalidateQuoteQueries(queryClient)
     },
   })
 }
@@ -95,9 +125,7 @@ export function useSetQuoteStatus() {
     mutationFn: async (input: { quoteId: string; status: QuoteStatus }) =>
       setQuoteStatus(input.quoteId, input.status),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['quotes'] })
-      await queryClient.invalidateQueries({ queryKey: ['quote'] })
-      await queryClient.invalidateQueries({ queryKey: ['customer-quotes'] })
+      await invalidateQuoteQueries(queryClient)
     },
   })
 }
@@ -107,9 +135,7 @@ export function useDeleteQuote() {
   return useMutation({
     mutationFn: async (quoteId: string) => deleteQuote(quoteId),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['quotes'] })
-      await queryClient.invalidateQueries({ queryKey: ['quote'] })
-      await queryClient.invalidateQueries({ queryKey: ['customer-quotes'] })
+      await invalidateQuoteQueries(queryClient)
     },
   })
 }

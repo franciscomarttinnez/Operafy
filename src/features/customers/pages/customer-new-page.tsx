@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { CustomerForm } from '@/features/customers/components/customer-form'
 import { useCreateCustomer } from '@/features/customers/use-customers'
-import { useLocale } from '@/i18n/locale-provider'
+import { useLocale } from '@/i18n/use-locale'
 import { getErrorMessage } from '@/lib/errors'
 
 export function CustomerNewPage() {

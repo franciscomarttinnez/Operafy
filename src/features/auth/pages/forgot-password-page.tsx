@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { requestPasswordReset } from '@/features/auth/auth-service'
-import { useLocale } from '@/i18n/locale-provider'
+import { useLocale } from '@/i18n/use-locale'
 import { hasPublicEnv } from '@/lib/env'
 
 type ForgotValues = {

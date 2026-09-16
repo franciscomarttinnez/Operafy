@@ -6,7 +6,7 @@ import { QuoteForm } from '@/features/quotes/components/quote-form'
 import { useCreateQuote } from '@/features/quotes/use-quotes'
 import { useCustomers } from '@/features/customers/use-customers'
 import { useOrganization } from '@/features/organizations/use-organization'
-import { useLocale } from '@/i18n/locale-provider'
+import { useLocale } from '@/i18n/use-locale'
 import { getErrorMessage } from '@/lib/errors'
 
 export function QuoteNewPage() {
@@ -66,7 +66,6 @@ export function QuoteNewPage() {
         <CardContent>
           {formError ? <p className="mb-4 text-sm text-destructive">{formError}</p> : null}
           <QuoteForm
-            customers={customersQuery.data ?? []}
             currencyCode={organization?.default_currency ?? 'USD'}
             submitLabel={t('quotes.create')}
             onCancel={() => navigate('/quotes')}

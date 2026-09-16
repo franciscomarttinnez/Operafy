@@ -1,39 +1,18 @@
 import { getSupabaseClient } from '@/lib/supabase'
+import { throwSupabaseError, type SupabaseErrorLike } from '@/lib/errors'
 import type { QuoteWriteInput } from '@/features/quotes/quote-schema'
 import type { QuoteStatus } from '@/features/quotes/quote-status'
 import type { Quote, QuoteDetail, QuoteWithCustomer } from '@/types/database'
 
-function formatSupabaseError(error: {
-  message?: string
-  details?: string
-  hint?: string
-  code?: string
-}): string {
-  const parts = [error.message, error.details, error.hint, error.code ? `(${error.code})` : null]
-    .filter((part): part is string => Boolean(part && part.trim().length > 0))
-  return parts.length > 0 ? parts.join(' — ') : 'Unexpected database error.'
+function throwQuoteDbError(error: SupabaseErrorLike): never {
+  throwSupabaseError(error, {
+    missingFunction:
+      'Quotes database setup is missing. Run supabase/migrations/005_quotes.sql in the Supabase SQL Editor, then try again.',
+  })
 }
 
-function throwQuoteDbError(error: {
-  message?: string
-  details?: string
-  hint?: string
-  code?: string
-}): never {
-  const message = formatSupabaseError(error)
-  const lower = message.toLowerCase()
-  if (
-    error.code === 'PGRST202' ||
-    error.code === 'PGRST205' ||
-    lower.includes('could not find the function') ||
-    lower.includes('could not find the table')
-  ) {
-    throw new Error(
-      'Quotes database setup is missing. Run supabase/migrations/005_quotes.sql in the Supabase SQL Editor, then try again.',
-    )
-  }
-  throw new Error(message)
-}
+const QUOTE_LIST_PAGE_SIZE = 50
+const QUOTE_AGGREGATE_PAGE_SIZE = 500
 
 export async function listQuotes(organizationId: string): Promise<QuoteWithCustomer[]> {
   const supabase = getSupabaseClient()
@@ -42,13 +21,47 @@ export async function listQuotes(organizationId: string): Promise<QuoteWithCusto
     .select('*, customers(id, name, email, phone, address)')
     .eq('organization_id', organizationId)
     .order('created_at', { ascending: false })
-    .limit(50)
+    .limit(QUOTE_LIST_PAGE_SIZE)
 
   if (error) {
     throwQuoteDbError(error)
   }
 
   return (data ?? []) as QuoteWithCustomer[]
+}
+
+/**
+ * Fetches every quote for the organization, paginated in large batches.
+ * Used for KPI/aggregate calculations (dashboard) where `listQuotes`'s fixed
+ * page size would silently undercount once an org has more than 50 quotes.
+ */
+export async function listAllQuotes(organizationId: string): Promise<QuoteWithCustomer[]> {
+  const supabase = getSupabaseClient()
+  const rows: QuoteWithCustomer[] = []
+  let from = 0
+
+  for (;;) {
+    const { data, error } = await supabase
+      .from('quotes')
+      .select('*, customers(id, name, email, phone, address)')
+      .eq('organization_id', organizationId)
+      .order('created_at', { ascending: false })
+      .range(from, from + QUOTE_AGGREGATE_PAGE_SIZE - 1)
+
+    if (error) {
+      throwQuoteDbError(error)
+    }
+
+    const batch = (data ?? []) as QuoteWithCustomer[]
+    rows.push(...batch)
+
+    if (batch.length < QUOTE_AGGREGATE_PAGE_SIZE) {
+      break
+    }
+    from += QUOTE_AGGREGATE_PAGE_SIZE
+  }
+
+  return rows
 }
 
 export async function listQuotesForCustomer(

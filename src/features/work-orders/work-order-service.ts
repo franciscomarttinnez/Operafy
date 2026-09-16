@@ -1,4 +1,5 @@
 import { getSupabaseClient } from '@/lib/supabase'
+import { throwSupabaseError, type SupabaseErrorLike } from '@/lib/errors'
 import type {
   WorkOrderUpdateInput,
   WorkOrderWriteInput,
@@ -6,52 +7,17 @@ import type {
 import type { WorkOrderStatus } from '@/features/work-orders/work-order-status'
 import type { WorkOrder, WorkOrderWithCustomer } from '@/types/database'
 
-function formatSupabaseError(error: {
-  message?: string
-  details?: string
-  hint?: string
-  code?: string
-}): string {
-  const parts = [error.message, error.details, error.hint, error.code ? `(${error.code})` : null]
-    .filter((part): part is string => Boolean(part && part.trim().length > 0))
-
-  if (parts.length === 0) {
-    return 'Unexpected database error.'
-  }
-
-  return parts.join(' — ')
-}
-
-function throwWorkOrderDbError(error: {
-  message?: string
-  details?: string
-  hint?: string
-  code?: string
-}): never {
-  const message = formatSupabaseError(error)
-  const lower = message.toLowerCase()
-
-  if (
-    error.code === 'PGRST202' ||
-    lower.includes('could not find the function') ||
-    lower.includes('schema cache')
-  ) {
-    throw new Error(
+function throwWorkOrderDbError(error: SupabaseErrorLike): never {
+  throwSupabaseError(error, {
+    missingFunction:
       'Work orders database setup is missing. Run supabase/migrations/007_work_orders.sql in the Supabase SQL Editor, then try again.',
-    )
-  }
-
-  if (
-    error.code === 'PGRST205' ||
-    lower.includes("could not find the table 'public.work_orders'")
-  ) {
-    throw new Error(
+    missingTable:
       'Work orders table is missing. Run supabase/migrations/007_work_orders.sql in the Supabase SQL Editor, then try again.',
-    )
-  }
-
-  throw new Error(message)
+  })
 }
+
+const WORK_ORDER_LIST_PAGE_SIZE = 50
+const WORK_ORDER_AGGREGATE_PAGE_SIZE = 500
 
 export async function listWorkOrders(organizationId: string): Promise<WorkOrderWithCustomer[]> {
   const supabase = getSupabaseClient()
@@ -62,13 +28,52 @@ export async function listWorkOrders(organizationId: string): Promise<WorkOrderW
     )
     .eq('organization_id', organizationId)
     .order('created_at', { ascending: false })
-    .limit(50)
+    .limit(WORK_ORDER_LIST_PAGE_SIZE)
 
   if (error) {
     throwWorkOrderDbError(error)
   }
 
   return (data ?? []) as WorkOrderWithCustomer[]
+}
+
+/**
+ * Fetches every work order for the organization, paginated in large batches.
+ * Used for KPI/aggregate calculations (dashboard, payment balances) where
+ * `listWorkOrders`'s fixed page size would silently undercount once an org
+ * has more than 50 work orders.
+ */
+export async function listAllWorkOrders(
+  organizationId: string,
+): Promise<WorkOrderWithCustomer[]> {
+  const supabase = getSupabaseClient()
+  const rows: WorkOrderWithCustomer[] = []
+  let from = 0
+
+  for (;;) {
+    const { data, error } = await supabase
+      .from('work_orders')
+      .select(
+        '*, customers(id, name, email, phone, address), quotes(id, quote_number, title, total, status)',
+      )
+      .eq('organization_id', organizationId)
+      .order('created_at', { ascending: false })
+      .range(from, from + WORK_ORDER_AGGREGATE_PAGE_SIZE - 1)
+
+    if (error) {
+      throwWorkOrderDbError(error)
+    }
+
+    const batch = (data ?? []) as WorkOrderWithCustomer[]
+    rows.push(...batch)
+
+    if (batch.length < WORK_ORDER_AGGREGATE_PAGE_SIZE) {
+      break
+    }
+    from += WORK_ORDER_AGGREGATE_PAGE_SIZE
+  }
+
+  return rows
 }
 
 export async function listWorkOrdersForCustomer(

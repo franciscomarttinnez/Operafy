@@ -1,4 +1,4 @@
-import { useLocale } from '@/i18n/locale-provider'
+import { useLocale } from '@/i18n/use-locale'
 import { workOrderStatusLabelKeys } from '@/features/work-orders/work-order-status-i18n'
 import { cn } from '@/lib/utils'
 import type { WorkOrderStatus } from '@/features/work-orders/work-order-status'

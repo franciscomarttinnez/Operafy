@@ -11,7 +11,7 @@ import { useCustomerWorkOrders } from '@/features/work-orders/use-work-orders'
 import { paymentMethodLabelKeys } from '@/features/payments/payment-method-i18n'
 import { useCustomerPayments } from '@/features/payments/use-payments'
 import { useOrganization } from '@/features/organizations/use-organization'
-import { useLocale } from '@/i18n/locale-provider'
+import { useLocale } from '@/i18n/use-locale'
 import { formatMoney } from '@/lib/money'
 import { getErrorMessage } from '@/lib/errors'
 

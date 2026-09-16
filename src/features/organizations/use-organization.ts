@@ -1,10 +1,12 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '@/features/auth/use-auth'
 import {
   createOrganization,
   getOrganization,
   getProfile,
+  updateOrganization,
   type CreateOrganizationInput,
+  type UpdateOrganizationInput,
 } from '@/features/organizations/organization-service'
 import type { Organization, Profile } from '@/types/database'
 
@@ -57,14 +59,34 @@ export function useCreateOrganization() {
   const queryClient = useQueryClient()
   const { user } = useAuth()
 
-  return async (input: CreateOrganizationInput) => {
-    const organization = await createOrganization(input)
-    if (user) {
-      await queryClient.invalidateQueries({ queryKey: profileQueryKey(user.id) })
-    }
-    await queryClient.invalidateQueries({
-      queryKey: organizationQueryKey(organization.id),
-    })
-    return organization
-  }
+  return useMutation({
+    mutationFn: async (input: CreateOrganizationInput) => createOrganization(input),
+    onSuccess: async (organization) => {
+      if (user) {
+        await queryClient.invalidateQueries({ queryKey: profileQueryKey(user.id) })
+      }
+      await queryClient.invalidateQueries({
+        queryKey: organizationQueryKey(organization.id),
+      })
+    },
+  })
+}
+
+export function useUpdateOrganization() {
+  const queryClient = useQueryClient()
+  const { organization } = useOrganization()
+
+  return useMutation({
+    mutationFn: async (input: UpdateOrganizationInput) => {
+      if (!organization?.id) {
+        throw new Error('Organization not found.')
+      }
+      return updateOrganization(organization.id, input)
+    },
+    onSuccess: async (updated) => {
+      await queryClient.invalidateQueries({
+        queryKey: organizationQueryKey(updated.id),
+      })
+    },
+  })
 }

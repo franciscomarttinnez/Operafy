@@ -1,26 +1,29 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMemo } from 'react'
-import { useForm, useWatch } from 'react-hook-form'
+import { Controller, useForm, useWatch } from 'react-hook-form'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { SearchableSelect } from '@/components/searchable-select'
 import { PAYMENT_METHODS } from '@/features/payments/payment-method'
 import { paymentMethodLabelKeys } from '@/features/payments/payment-method-i18n'
 import {
   createPaymentFormSchema,
+  paymentToFormValues,
   toPaymentWriteInput,
   type PaymentFormValues,
   type PaymentWriteInput,
 } from '@/features/payments/payment-schema'
-import { useLocale } from '@/i18n/locale-provider'
+import { useLocale } from '@/i18n/use-locale'
 import { calculatePaymentBalance, formatMoney, fromMinorUnits } from '@/lib/money'
-import type { WorkOrderWithCustomer } from '@/types/database'
+import type { Payment, WorkOrderWithCustomer } from '@/types/database'
 
 type PaymentFormProps = {
   workOrders: WorkOrderWithCustomer[]
   paidByWorkOrderId: Record<string, number>
   lockWorkOrderId?: string
+  initialPayment?: Payment | null
   submitLabel: string
   currencyCode?: string
   onCancel: () => void
@@ -39,6 +42,7 @@ export function PaymentForm({
   workOrders,
   paidByWorkOrderId,
   lockWorkOrderId,
+  initialPayment,
   submitLabel,
   currencyCode = 'USD',
   onCancel,
@@ -46,8 +50,9 @@ export function PaymentForm({
 }: PaymentFormProps) {
   const { t, locale } = useLocale()
   const moneyLocale = locale === 'es' ? 'es' : 'en'
-  const locked = Boolean(lockWorkOrderId)
+  const locked = Boolean(lockWorkOrderId || initialPayment)
   const schema = useMemo(() => createPaymentFormSchema(t), [t])
+  const editingAmountMinor = initialPayment?.amount ?? 0
 
   const {
     register,
@@ -57,31 +62,58 @@ export function PaymentForm({
     formState: { errors, isSubmitting },
   } = useForm<PaymentFormValues>({
     resolver: zodResolver(schema),
-    defaultValues: {
-      workOrderId: lockWorkOrderId ?? '',
-      amount: '',
-      method: 'cash',
-      paidAt: todayInputValue(),
-      notes: '',
-    },
+    defaultValues: initialPayment
+      ? paymentToFormValues(initialPayment)
+      : {
+          workOrderId: lockWorkOrderId ?? '',
+          amount: '',
+          method: 'cash',
+          paidAt: todayInputValue(),
+          notes: '',
+        },
   })
 
   const selectedWorkOrderId = useWatch({ control, name: 'workOrderId' })
   const selectedWorkOrder =
     workOrders.find((job) => job.id === selectedWorkOrderId) ??
     workOrders.find((job) => job.id === lockWorkOrderId) ??
+    workOrders.find((job) => job.id === initialPayment?.work_order_id) ??
     null
 
-  const paidMinor = selectedWorkOrder
+  const paidMinorRaw = selectedWorkOrder
     ? (paidByWorkOrderId[selectedWorkOrder.id] ?? 0)
     : 0
-  const balance = selectedWorkOrder
-    ? calculatePaymentBalance(selectedWorkOrder.billable_amount, paidMinor)
+  const otherPaidMinor = Math.max(paidMinorRaw - editingAmountMinor, 0)
+  const available = selectedWorkOrder
+    ? calculatePaymentBalance(selectedWorkOrder.billable_amount, otherPaidMinor)
     : null
+
+  const workOrderOptions = useMemo(
+    () =>
+      workOrders.map((job) => {
+        const remaining = calculatePaymentBalance(
+          job.billable_amount,
+          paidByWorkOrderId[job.id] ?? 0,
+        ).balanceMinor
+        return {
+          value: job.id,
+          label: job.title,
+          description: [
+            job.customers?.name,
+            formatMoney(remaining, currencyCode, moneyLocale),
+            job.quotes?.quote_number,
+          ]
+            .filter(Boolean)
+            .join(' · '),
+          keywords: [job.customers?.name, job.quotes?.quote_number].filter(Boolean).join(' '),
+        }
+      }),
+    [workOrders, paidByWorkOrderId, currencyCode, moneyLocale],
+  )
 
   const submit = handleSubmit(async (values) => {
     const input = toPaymentWriteInput(values)
-    if (balance && input.amountMinor > balance.balanceMinor) {
+    if (available && input.amountMinor > available.balanceMinor) {
       setError('amount', {
         type: 'custom',
         message: t('payments.amountExceedsBalance'),
@@ -105,45 +137,41 @@ export function PaymentForm({
             />
           </>
         ) : (
-          <select
-            id="workOrderId"
-            className="flex h-10 w-full rounded-lg border border-input bg-card px-3 text-sm shadow-sm focus-visible:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
-            {...register('workOrderId')}
-          >
-            <option value="">{t('payments.selectWorkOrder')}</option>
-            {workOrders.map((job) => {
-              const remaining = calculatePaymentBalance(
-                job.billable_amount,
-                paidByWorkOrderId[job.id] ?? 0,
-              ).balanceMinor
-              return (
-                <option key={job.id} value={job.id} disabled={remaining <= 0}>
-                  {job.title}
-                  {job.customers?.name ? ` · ${job.customers.name}` : ''}
-                  {` · ${formatMoney(remaining, currencyCode, moneyLocale)}`}
-                </option>
-              )
-            })}
-          </select>
+          <Controller
+            name="workOrderId"
+            control={control}
+            render={({ field }) => (
+              <SearchableSelect
+                id="workOrderId"
+                value={field.value}
+                onChange={field.onChange}
+                options={workOrderOptions}
+                placeholder={t('forms.selectWorkOrder')}
+                searchPlaceholder={t('forms.searchWorkOrder')}
+                emptyLabel={t('forms.noWorkOrderMatch')}
+                recentHint={t('forms.recentWorkOrders')}
+              />
+            )}
+          />
         )}
         {errors.workOrderId ? (
           <p className="text-sm text-destructive">{errors.workOrderId.message}</p>
         ) : null}
       </div>
 
-      {balance ? (
+      {available ? (
         <div className="rounded-xl border border-border bg-accent/40 px-4 py-3 text-sm">
           <div className="flex justify-between gap-3">
             <span className="text-muted-foreground">{t('payments.billable')}</span>
-            <span>{formatMoney(balance.billableMinor, currencyCode, moneyLocale)}</span>
+            <span>{formatMoney(available.billableMinor, currencyCode, moneyLocale)}</span>
           </div>
           <div className="mt-1 flex justify-between gap-3">
-            <span className="text-muted-foreground">{t('payments.paid')}</span>
-            <span>{formatMoney(balance.paidMinor, currencyCode, moneyLocale)}</span>
+            <span className="text-muted-foreground">{t('payments.otherPaid')}</span>
+            <span>{formatMoney(available.paidMinor, currencyCode, moneyLocale)}</span>
           </div>
           <div className="mt-1 flex justify-between gap-3 font-medium">
-            <span>{t('payments.balance')}</span>
-            <span>{formatMoney(balance.balanceMinor, currencyCode, moneyLocale)}</span>
+            <span>{t('payments.availableForThis')}</span>
+            <span>{formatMoney(available.balanceMinor, currencyCode, moneyLocale)}</span>
           </div>
         </div>
       ) : null}
@@ -155,8 +183,8 @@ export function PaymentForm({
             id="amount"
             inputMode="decimal"
             placeholder={
-              balance
-                ? String(fromMinorUnits(Math.max(balance.balanceMinor, 0)))
+              available
+                ? String(fromMinorUnits(Math.max(available.balanceMinor, 0)))
                 : undefined
             }
             {...register('amount')}
@@ -207,7 +235,10 @@ export function PaymentForm({
         <Button
           type="submit"
           className="w-full sm:w-auto"
-          disabled={isSubmitting || (balance !== null && balance.balanceMinor <= 0)}
+          disabled={
+            isSubmitting ||
+            (available !== null && available.balanceMinor <= 0 && !initialPayment)
+          }
         >
           {isSubmitting ? t('common.saving') : submitLabel}
         </Button>

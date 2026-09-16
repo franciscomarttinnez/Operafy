@@ -16,9 +16,66 @@ import {
   useQuoteWorkOrder,
 } from '@/features/work-orders/use-work-orders'
 import { useOrganization } from '@/features/organizations/use-organization'
-import { useLocale } from '@/i18n/locale-provider'
+import { useLocale } from '@/i18n/use-locale'
 import { formatMoney } from '@/lib/money'
 import { getErrorMessage } from '@/lib/errors'
+
+/**
+ * "Convert to work order" button. Extracted so it can be rendered in both
+ * the desktop action bar and the mobile sticky action bar without repeating
+ * the label/loading logic in two places.
+ */
+function ConvertToWorkOrderButton({
+  pending,
+  disabled,
+  onClick,
+  className,
+}: {
+  pending: boolean
+  disabled: boolean
+  onClick: () => void
+  className: string
+}) {
+  const { t } = useLocale()
+  return (
+    <Button className={className} disabled={disabled} onClick={onClick}>
+      {pending ? t('workOrders.convertFromQuoteBusy') : t('workOrders.convertFromQuote')}
+    </Button>
+  )
+}
+
+/**
+ * Renders one button per forward status transition (e.g. draft -> sent).
+ * Extracted so the desktop action bar and the mobile sticky action bar stay
+ * in sync without duplicating the transition list rendering.
+ */
+function QuoteForwardTransitionButtons({
+  transitions,
+  pending,
+  onSelect,
+  className,
+}: {
+  transitions: QuoteStatus[]
+  pending: boolean
+  onSelect: (status: QuoteStatus) => void
+  className: string
+}) {
+  const { t } = useLocale()
+  return (
+    <>
+      {transitions.map((status) => (
+        <Button
+          key={status}
+          className={className}
+          disabled={pending}
+          onClick={() => onSelect(status)}
+        >
+          {t('quotes.markStatus', { status: t(quoteStatusLabelKeys[status]) })}
+        </Button>
+      ))}
+    </>
+  )
+}
 
 export function QuoteDetailPage() {
   const { quoteId } = useParams<{ quoteId: string }>()
@@ -92,8 +149,21 @@ export function QuoteDetailPage() {
       })
   }
 
+  const handleConvertToWorkOrder = () => {
+    setActionError(null)
+    void createFromQuote
+      .mutateAsync({ quoteId: quote.id })
+      .then((job) => {
+        navigate(`/work-orders/${job.id}`)
+      })
+      .catch((error: unknown) => {
+        console.error(error)
+        setActionError(getErrorMessage(error, t('workOrders.convertError')))
+      })
+  }
+
   return (
-    <div className="animate-fade-in-up space-y-6">
+    <div className="animate-fade-in-up space-y-6 pb-24 md:pb-0">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0">
           <p className="text-sm text-muted-foreground">
@@ -115,39 +185,21 @@ export function QuoteDetailPage() {
           </p>
         </div>
 
-        <div className="flex w-full flex-col gap-2 sm:max-w-xl sm:flex-row sm:flex-wrap sm:justify-end lg:w-auto">
+        <div className="hidden w-full flex-col gap-2 sm:max-w-xl sm:flex-row sm:flex-wrap sm:justify-end md:flex lg:w-auto">
           {quote.status === 'accepted' && !linkedWorkOrderQuery.data ? (
-            <Button
+            <ConvertToWorkOrderButton
               className="w-full sm:w-auto"
+              pending={createFromQuote.isPending}
               disabled={createFromQuote.isPending || linkedWorkOrderQuery.isLoading}
-              onClick={() => {
-                setActionError(null)
-                void createFromQuote
-                  .mutateAsync({ quoteId: quote.id })
-                  .then((job) => {
-                    navigate(`/work-orders/${job.id}`)
-                  })
-                  .catch((error: unknown) => {
-                    console.error(error)
-                    setActionError(getErrorMessage(error, t('workOrders.convertError')))
-                  })
-              }}
-            >
-              {createFromQuote.isPending
-                ? t('workOrders.convertFromQuoteBusy')
-                : t('workOrders.convertFromQuote')}
-            </Button>
+              onClick={handleConvertToWorkOrder}
+            />
           ) : null}
-          {forwardTransitions.map((status) => (
-            <Button
-              key={status}
-              className="w-full sm:w-auto"
-              disabled={setStatus.isPending}
-              onClick={() => applyStatus(status as QuoteStatus)}
-            >
-              {t('quotes.markStatus', { status: t(quoteStatusLabelKeys[status]) })}
-            </Button>
-          ))}
+          <QuoteForwardTransitionButtons
+            className="w-full sm:w-auto"
+            transitions={forwardTransitions}
+            pending={setStatus.isPending}
+            onSelect={applyStatus}
+          />
           {quote.status === 'accepted' && linkedWorkOrderQuery.data ? (
             <Button asChild variant="outline" className="w-full sm:w-auto">
               <Link to={`/work-orders/${linkedWorkOrderQuery.data.id}`}>
@@ -179,6 +231,46 @@ export function QuoteDetailPage() {
             <Button
               variant="destructive"
               className="w-full sm:w-auto"
+              disabled={deleteQuote.isPending}
+              onClick={() => setDeleteOpen(true)}
+            >
+              {deleteQuote.isPending ? t('common.deleting') : t('common.delete')}
+            </Button>
+          ) : null}
+        </div>
+
+        <div className="grid grid-cols-2 gap-2 md:hidden">
+          <Button asChild variant="outline" className="w-full">
+            <Link to={`/quotes/${quote.id}/print`} target="_blank" rel="noreferrer">
+              {t('quotes.printPdf')}
+            </Link>
+          </Button>
+          {quote.status === 'accepted' && linkedWorkOrderQuery.data ? (
+            <Button asChild variant="outline" className="w-full">
+              <Link to={`/work-orders/${linkedWorkOrderQuery.data.id}`}>
+                {t('workOrders.viewExisting')}
+              </Link>
+            </Button>
+          ) : null}
+          {isQuoteEditable(quote.status) ? (
+            <Button asChild variant="outline" className="w-full">
+              <Link to={`/quotes/${quote.id}/edit`}>{t('common.edit')}</Link>
+            </Button>
+          ) : null}
+          {canReject ? (
+            <Button
+              variant="outline"
+              className="w-full"
+              disabled={setStatus.isPending}
+              onClick={() => setRejectOpen(true)}
+            >
+              {t('quotes.markStatus', { status: t(quoteStatusLabelKeys.rejected) })}
+            </Button>
+          ) : null}
+          {isQuoteEditable(quote.status) ? (
+            <Button
+              variant="destructive"
+              className="w-full"
               disabled={deleteQuote.isPending}
               onClick={() => setDeleteOpen(true)}
             >
@@ -313,6 +405,28 @@ export function QuoteDetailPage() {
             })
         }}
       />
+
+      {forwardTransitions.length > 0 ||
+      (quote.status === 'accepted' && !linkedWorkOrderQuery.data) ? (
+        <div className="sticky-mobile-actions">
+          <div className="mx-auto flex w-full max-w-6xl flex-col gap-2">
+            {quote.status === 'accepted' && !linkedWorkOrderQuery.data ? (
+              <ConvertToWorkOrderButton
+                className="w-full"
+                pending={createFromQuote.isPending}
+                disabled={createFromQuote.isPending || linkedWorkOrderQuery.isLoading}
+                onClick={handleConvertToWorkOrder}
+              />
+            ) : null}
+            <QuoteForwardTransitionButtons
+              className="w-full"
+              transitions={forwardTransitions}
+              pending={setStatus.isPending}
+              onSelect={applyStatus}
+            />
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }

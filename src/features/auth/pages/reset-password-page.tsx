@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { updatePassword } from '@/features/auth/auth-service'
 import { useAuth } from '@/features/auth/use-auth'
-import { useLocale } from '@/i18n/locale-provider'
+import { useLocale } from '@/i18n/use-locale'
 import { getSupabaseClient } from '@/lib/supabase'
 import { hasPublicEnv } from '@/lib/env'
 

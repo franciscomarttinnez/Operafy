@@ -6,7 +6,7 @@ import { WorkOrderForm } from '@/features/work-orders/components/work-order-form
 import { useCreateWorkOrder } from '@/features/work-orders/use-work-orders'
 import { useCustomers } from '@/features/customers/use-customers'
 import { useOrganization } from '@/features/organizations/use-organization'
-import { useLocale } from '@/i18n/locale-provider'
+import { useLocale } from '@/i18n/use-locale'
 import { getErrorMessage } from '@/lib/errors'
 
 export function WorkOrderNewPage() {
@@ -68,7 +68,6 @@ export function WorkOrderNewPage() {
         <CardContent>
           {formError ? <p className="mb-4 text-sm text-destructive">{formError}</p> : null}
           <WorkOrderForm
-            customers={customersQuery.data ?? []}
             lockCustomerId={presetCustomerId}
             currencyCode={organization?.default_currency ?? 'USD'}
             submitLabel={t('workOrders.create')}

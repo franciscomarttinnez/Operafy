@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, type ReactNode } from 'react'
 import { Button } from '@/components/ui/button'
-import { useLocale } from '@/i18n/locale-provider'
+import { useLocale } from '@/i18n/use-locale'
 
 type ConfirmDialogProps = {
   open: boolean
@@ -66,7 +66,7 @@ export function ConfirmDialog({
   }
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-end justify-center p-4 sm:items-center">
+    <div className="fixed inset-0 z-[60] flex items-end justify-center p-0 sm:items-center sm:p-4">
       <button
         type="button"
         className="absolute inset-0 bg-slate-900/45 backdrop-blur-[2px]"
@@ -83,8 +83,9 @@ export function ConfirmDialog({
         aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={descriptionId}
-        className="relative z-10 w-full max-w-md rounded-xl border border-border bg-card p-5 shadow-lg"
+        className="relative z-10 w-full max-w-md rounded-t-2xl border border-border bg-card p-5 shadow-lg sm:rounded-xl pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:pb-5"
       >
+        <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-border sm:hidden" aria-hidden />
         <h2 id={titleId} className="text-lg font-semibold text-foreground">
           {title}
         </h2>

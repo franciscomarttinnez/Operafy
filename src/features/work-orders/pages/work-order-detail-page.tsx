@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ConfirmDialog } from '@/components/confirm-dialog'
-import { Button } from '@/components/ui/button'
+import { Button, type ButtonProps } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { WorkOrderStatusBadge } from '@/features/work-orders/components/work-order-status-badge'
 import { workOrderStatusLabelKeys } from '@/features/work-orders/work-order-status-i18n'
@@ -22,9 +22,63 @@ import {
 } from '@/features/payments/use-payments'
 import { paymentMethodLabelKeys } from '@/features/payments/payment-method-i18n'
 import { useOrganization } from '@/features/organizations/use-organization'
-import { useLocale } from '@/i18n/locale-provider'
+import { useLocale } from '@/i18n/use-locale'
 import { calculatePaymentBalance, formatMoney, sumPaymentAmountsMinor } from '@/lib/money'
 import { getErrorMessage } from '@/lib/errors'
+
+/**
+ * Renders one button per forward status transition (e.g. pending -> scheduled).
+ * Extracted so the desktop action bar and the mobile sticky action bar stay
+ * in sync without duplicating the transition list rendering.
+ */
+function WorkOrderForwardTransitionButtons({
+  transitions,
+  pending,
+  onSelect,
+  className,
+}: {
+  transitions: WorkOrderStatus[]
+  pending: boolean
+  onSelect: (status: WorkOrderStatus) => void
+  className: string
+}) {
+  const { t } = useLocale()
+  return (
+    <>
+      {transitions.map((status) => (
+        <Button
+          key={status}
+          className={className}
+          disabled={pending}
+          onClick={() => onSelect(status)}
+        >
+          {t('workOrders.markStatus', { status: t(workOrderStatusLabelKeys[status]) })}
+        </Button>
+      ))}
+    </>
+  )
+}
+
+/**
+ * "Register payment" link button, reused across the desktop action bar, the
+ * empty payments state, and the mobile sticky action bar.
+ */
+function RegisterPaymentButton({
+  workOrderId,
+  variant,
+  className,
+}: {
+  workOrderId: string
+  variant?: ButtonProps['variant']
+  className: string
+}) {
+  const { t } = useLocale()
+  return (
+    <Button asChild variant={variant} className={className}>
+      <Link to={`/payments/new?workOrderId=${workOrderId}`}>{t('payments.new')}</Link>
+    </Button>
+  )
+}
 
 export function WorkOrderDetailPage() {
   const { workOrderId } = useParams<{ workOrderId: string }>()
@@ -103,7 +157,7 @@ export function WorkOrderDetailPage() {
   }
 
   return (
-    <div className="animate-fade-in-up space-y-6">
+    <div className="animate-fade-in-up space-y-6 pb-24 md:pb-0">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0">
           <p className="text-sm text-muted-foreground">
@@ -125,22 +179,19 @@ export function WorkOrderDetailPage() {
           </p>
         </div>
 
-        <div className="flex w-full flex-col gap-2 sm:max-w-xl sm:flex-row sm:flex-wrap sm:justify-end lg:w-auto">
+        <div className="hidden w-full flex-col gap-2 sm:max-w-xl sm:flex-row sm:flex-wrap sm:justify-end md:flex lg:w-auto">
           {canCollect ? (
-            <Button asChild className="w-full sm:w-auto">
-              <Link to={`/payments/new?workOrderId=${job.id}`}>{t('payments.new')}</Link>
-            </Button>
-          ) : null}
-          {forwardTransitions.map((status) => (
-            <Button
-              key={status}
+            <RegisterPaymentButton
+              workOrderId={job.id}
               className="w-full sm:w-auto"
-              disabled={setStatus.isPending}
-              onClick={() => applyStatus(status as WorkOrderStatus)}
-            >
-              {t('workOrders.markStatus', { status: t(workOrderStatusLabelKeys[status]) })}
-            </Button>
-          ))}
+            />
+          ) : null}
+          <WorkOrderForwardTransitionButtons
+            className="w-full sm:w-auto"
+            transitions={forwardTransitions}
+            pending={setStatus.isPending}
+            onSelect={applyStatus}
+          />
           {isWorkOrderEditable(job.status) ? (
             <Button asChild variant="outline" className="w-full sm:w-auto">
               <Link to={`/work-orders/${job.id}/edit`}>{t('common.edit')}</Link>
@@ -160,6 +211,34 @@ export function WorkOrderDetailPage() {
             <Button
               variant="destructive"
               className="w-full sm:w-auto"
+              disabled={deleteWorkOrder.isPending}
+              onClick={() => setDeleteOpen(true)}
+            >
+              {deleteWorkOrder.isPending ? t('common.deleting') : t('common.delete')}
+            </Button>
+          ) : null}
+        </div>
+
+        <div className="grid grid-cols-2 gap-2 md:hidden">
+          {isWorkOrderEditable(job.status) ? (
+            <Button asChild variant="outline" className="w-full">
+              <Link to={`/work-orders/${job.id}/edit`}>{t('common.edit')}</Link>
+            </Button>
+          ) : null}
+          {canCancel ? (
+            <Button
+              variant="outline"
+              className="w-full"
+              disabled={setStatus.isPending}
+              onClick={() => setCancelOpen(true)}
+            >
+              {t('workOrders.markStatus', { status: t(workOrderStatusLabelKeys.cancelled) })}
+            </Button>
+          ) : null}
+          {isWorkOrderDeletable(job.status) ? (
+            <Button
+              variant="destructive"
+              className="w-full"
               disabled={deleteWorkOrder.isPending}
               onClick={() => setDeleteOpen(true)}
             >
@@ -284,9 +363,11 @@ export function WorkOrderDetailPage() {
             <div className="space-y-3">
               <p className="text-sm text-muted-foreground">{t('payments.empty')}</p>
               {canCollect ? (
-                <Button asChild variant="outline" className="w-full sm:w-auto">
-                  <Link to={`/payments/new?workOrderId=${job.id}`}>{t('payments.new')}</Link>
-                </Button>
+                <RegisterPaymentButton
+                  workOrderId={job.id}
+                  variant="outline"
+                  className="w-full sm:w-auto"
+                />
               ) : null}
             </div>
           ) : null}
@@ -304,16 +385,21 @@ export function WorkOrderDetailPage() {
                   {t(paymentMethodLabelKeys[payment.method])}
                 </p>
               </div>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="w-full sm:w-auto"
-                disabled={deletePayment.isPending}
-                onClick={() => setPaymentToDelete(payment.id)}
-              >
-                {t('common.delete')}
-              </Button>
+              <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+                <Button asChild variant="outline" size="sm" className="w-full sm:w-auto">
+                  <Link to={`/payments/${payment.id}/edit`}>{t('payments.edit')}</Link>
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="w-full sm:w-auto"
+                  disabled={deletePayment.isPending}
+                  onClick={() => setPaymentToDelete(payment.id)}
+                >
+                  {t('common.delete')}
+                </Button>
+              </div>
             </div>
           ))}
         </CardContent>
@@ -380,6 +466,26 @@ export function WorkOrderDetailPage() {
             })
         }}
       />
+
+      {canCollect || forwardTransitions.length > 0 ? (
+        <div className="sticky-mobile-actions">
+          <div className="mx-auto flex w-full max-w-6xl flex-col gap-2">
+            <WorkOrderForwardTransitionButtons
+              className="w-full"
+              transitions={forwardTransitions}
+              pending={setStatus.isPending}
+              onSelect={applyStatus}
+            />
+            {canCollect ? (
+              <RegisterPaymentButton
+                workOrderId={job.id}
+                variant={forwardTransitions.length > 0 ? 'outline' : 'default'}
+                className="w-full"
+              />
+            ) : null}
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }

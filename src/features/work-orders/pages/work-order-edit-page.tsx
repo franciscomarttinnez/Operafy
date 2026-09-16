@@ -3,18 +3,16 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { WorkOrderForm } from '@/features/work-orders/components/work-order-form'
-import { useCustomers } from '@/features/customers/use-customers'
 import { useOrganization } from '@/features/organizations/use-organization'
 import { useUpdateWorkOrder, useWorkOrder } from '@/features/work-orders/use-work-orders'
 import { isWorkOrderEditable } from '@/features/work-orders/work-order-status'
-import { useLocale } from '@/i18n/locale-provider'
+import { useLocale } from '@/i18n/use-locale'
 import { getErrorMessage } from '@/lib/errors'
 
 export function WorkOrderEditPage() {
   const { workOrderId } = useParams<{ workOrderId: string }>()
   const navigate = useNavigate()
   const workOrderQuery = useWorkOrder(workOrderId)
-  const customersQuery = useCustomers('')
   const updateWorkOrder = useUpdateWorkOrder(workOrderId ?? '')
   const { organization } = useOrganization()
   const { t } = useLocale()
@@ -24,7 +22,7 @@ export function WorkOrderEditPage() {
     return <p className="text-sm text-destructive">{t('workOrders.missingId')}</p>
   }
 
-  if (workOrderQuery.isLoading || customersQuery.isLoading) {
+  if (workOrderQuery.isLoading) {
     return (
       <Card>
         <CardContent className="py-10 text-center text-sm text-muted-foreground">
@@ -102,7 +100,6 @@ export function WorkOrderEditPage() {
         <CardContent>
           {formError ? <p className="mb-4 text-sm text-destructive">{formError}</p> : null}
           <WorkOrderForm
-            customers={customersQuery.data ?? []}
             initialWorkOrder={workOrderQuery.data}
             currencyCode={organization?.default_currency ?? 'USD'}
             submitLabel={t('workOrders.saveChanges')}

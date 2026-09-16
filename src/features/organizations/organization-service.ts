@@ -9,6 +9,14 @@ export type CreateOrganizationInput = {
   defaultCurrency?: string
 }
 
+export type UpdateOrganizationInput = {
+  name: string
+  phone?: string | null
+  email?: string | null
+  address?: string | null
+  defaultCurrency: string
+}
+
 export async function getProfile(userId: string): Promise<Profile | null> {
   const supabase = getSupabaseClient()
   const { data, error } = await supabase
@@ -59,6 +67,35 @@ export async function createOrganization(
 
   if (!data) {
     throw new Error('Could not create organization.')
+  }
+
+  return data
+}
+
+export async function updateOrganization(
+  organizationId: string,
+  input: UpdateOrganizationInput,
+): Promise<Organization> {
+  const supabase = getSupabaseClient()
+  const { data, error } = await supabase
+    .from('organizations')
+    .update({
+      name: input.name,
+      phone: input.phone,
+      email: input.email,
+      address: input.address,
+      default_currency: input.defaultCurrency,
+    })
+    .eq('id', organizationId)
+    .select('*')
+    .single()
+
+  if (error) {
+    throw error
+  }
+
+  if (!data) {
+    throw new Error('Could not update organization.')
   }
 
   return data

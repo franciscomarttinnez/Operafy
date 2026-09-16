@@ -3,11 +3,11 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { PaymentForm } from '@/features/payments/components/payment-form'
-import { useCreatePayment, usePayments } from '@/features/payments/use-payments'
+import { useCreatePayment, usePaidByWorkOrderId } from '@/features/payments/use-payments'
 import { useWorkOrders } from '@/features/work-orders/use-work-orders'
 import { useOrganization } from '@/features/organizations/use-organization'
-import { useLocale } from '@/i18n/locale-provider'
-import { calculatePaymentBalance, sumPaymentAmountsMinor } from '@/lib/money'
+import { useLocale } from '@/i18n/use-locale'
+import { calculatePaymentBalance } from '@/lib/money'
 import { getErrorMessage } from '@/lib/errors'
 
 export function PaymentNewPage() {
@@ -16,18 +16,10 @@ export function PaymentNewPage() {
   const presetWorkOrderId = searchParams.get('workOrderId') ?? undefined
   const createPayment = useCreatePayment()
   const workOrdersQuery = useWorkOrders()
-  const paymentsQuery = usePayments()
+  const { paidByWorkOrderId, isLoading: paymentsLoading } = usePaidByWorkOrderId()
   const { organization } = useOrganization()
   const { t } = useLocale()
   const [formError, setFormError] = useState<string | null>(null)
-
-  const paidByWorkOrderId = useMemo(() => {
-    const map: Record<string, number> = {}
-    for (const payment of paymentsQuery.data ?? []) {
-      map[payment.work_order_id] = (map[payment.work_order_id] ?? 0) + payment.amount
-    }
-    return map
-  }, [paymentsQuery.data])
 
   const eligibleWorkOrders = useMemo(() => {
     return (workOrdersQuery.data ?? []).filter((job) => {
@@ -42,7 +34,7 @@ export function PaymentNewPage() {
   const lockedWorkOrder =
     workOrdersQuery.data?.find((job) => job.id === presetWorkOrderId) ?? null
 
-  if (workOrdersQuery.isLoading || paymentsQuery.isLoading) {
+  if (workOrdersQuery.isLoading || paymentsLoading) {
     return (
       <Card>
         <CardContent className="py-10 text-center text-sm text-muted-foreground">
@@ -95,11 +87,7 @@ export function PaymentNewPage() {
     lockedWorkOrder &&
     calculatePaymentBalance(
       lockedWorkOrder.billable_amount,
-      sumPaymentAmountsMinor(
-        (paymentsQuery.data ?? [])
-          .filter((payment) => payment.work_order_id === lockedWorkOrder.id)
-          .map((payment) => payment.amount),
-      ),
+      paidByWorkOrderId[lockedWorkOrder.id] ?? 0,
     ).balanceMinor <= 0
   ) {
     return (

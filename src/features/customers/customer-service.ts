@@ -1,4 +1,5 @@
 import { getSupabaseClient } from '@/lib/supabase'
+import { formatSupabaseError, throwSupabaseError, type SupabaseErrorLike } from '@/lib/errors'
 import type { CustomerWriteInput } from '@/features/customers/customer-schema'
 import type { Customer } from '@/types/database'
 
@@ -9,49 +10,8 @@ export type ListCustomersParams = {
   search?: string
 }
 
-function formatSupabaseError(error: {
-  message?: string
-  details?: string
-  hint?: string
-  code?: string
-}): string {
-  const parts = [error.message, error.details, error.hint, error.code ? `(${error.code})` : null]
-    .filter((part): part is string => Boolean(part && part.trim().length > 0))
-
-  if (parts.length === 0) {
-    return 'Unexpected database error.'
-  }
-
-  return parts.join(' — ')
-}
-
-function throwCustomerDbError(error: {
-  message?: string
-  details?: string
-  hint?: string
-  code?: string
-}): never {
-  const message = formatSupabaseError(error)
-  const lower = message.toLowerCase()
-
-  if (
-    error.code === 'PGRST202' ||
-    lower.includes('could not find the function') ||
-    lower.includes('schema cache')
-  ) {
-    throw new Error(
-      'Database is missing customer functions. Run supabase/migrations/004_customers_rpc.sql in the Supabase SQL Editor, then try again.',
-    )
-  }
-
-  if (
-    error.code === 'PGRST205' ||
-    lower.includes("could not find the table 'public.customers'")
-  ) {
-    throw new Error(
-      'Customers table is missing. Run supabase/migrations/004_customers_rpc.sql in the Supabase SQL Editor, then try again.',
-    )
-  }
+function throwCustomerDbError(error: SupabaseErrorLike): never {
+  const lower = formatSupabaseError(error).toLowerCase()
 
   if (lower.includes('existing quotes')) {
     throw new Error(
@@ -59,7 +19,12 @@ function throwCustomerDbError(error: {
     )
   }
 
-  throw new Error(message)
+  throwSupabaseError(error, {
+    missingFunction:
+      'Database is missing customer functions. Run supabase/migrations/004_customers_rpc.sql in the Supabase SQL Editor, then try again.',
+    missingTable:
+      'Customers table is missing. Run supabase/migrations/004_customers_rpc.sql in the Supabase SQL Editor, then try again.',
+  })
 }
 
 export async function listCustomers(

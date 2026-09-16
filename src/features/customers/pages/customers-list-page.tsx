@@ -1,27 +1,12 @@
 import { Plus, Search } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { useCustomers } from '@/features/customers/use-customers'
-import { useLocale } from '@/i18n/locale-provider'
-
-function useDebouncedValue(value: string, delayMs: number) {
-  const [debounced, setDebounced] = useState(value)
-
-  useEffect(() => {
-    const timeoutId = window.setTimeout(() => {
-      setDebounced(value)
-    }, delayMs)
-
-    return () => {
-      window.clearTimeout(timeoutId)
-    }
-  }, [value, delayMs])
-
-  return debounced
-}
+import { useDebouncedValue } from '@/hooks/use-debounced-value'
+import { useLocale } from '@/i18n/use-locale'
 
 export function CustomersListPage() {
   const { t } = useLocale()
@@ -52,8 +37,12 @@ export function CustomersListPage() {
           value={searchInput}
           onChange={(event) => setSearchInput(event.target.value)}
           placeholder={t('customers.search')}
-          className="pl-9"
+          className="h-11 pl-9"
           aria-label={t('customers.search')}
+          enterKeyHint="search"
+          autoComplete="off"
+          autoCorrect="off"
+          spellCheck={false}
         />
       </div>
 
@@ -97,8 +86,12 @@ export function CustomersListPage() {
         <>
           <div className="space-y-3 md:hidden">
             {customersQuery.data.map((customer) => (
-              <Link key={customer.id} to={`/customers/${customer.id}`} className="block">
-                <Card className="transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
+              <Link
+                key={customer.id}
+                to={`/customers/${customer.id}`}
+                className="touch-card block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <Card className="transition-colors active:bg-accent/50 md:transition-all md:hover:-translate-y-0.5 md:hover:shadow-md">
                   <CardContent className="space-y-1 p-4">
                     <p className="font-medium text-foreground">{customer.name}</p>
                     <p className="text-sm text-muted-foreground">

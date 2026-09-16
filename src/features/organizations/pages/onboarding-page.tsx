@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useCreateOrganization } from '@/features/organizations/use-organization'
-import { useLocale } from '@/i18n/locale-provider'
+import { useLocale } from '@/i18n/use-locale'
 import { getErrorMessage } from '@/lib/errors'
 
 type OnboardingValues = {
@@ -60,7 +60,7 @@ export function OnboardingPage() {
   const onSubmit = handleSubmit(async (values) => {
     setFormError(null)
     try {
-      await createOrganization({
+      await createOrganization.mutateAsync({
         name: values.name,
         phone: values.phone || undefined,
         email: values.email || undefined,
@@ -124,8 +124,14 @@ export function OnboardingPage() {
 
             {formError ? <p className="text-sm text-destructive">{formError}</p> : null}
 
-            <Button type="submit" className="w-full" disabled={isSubmitting}>
-              {isSubmitting ? t('onboarding.creating') : t('onboarding.continue')}
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={isSubmitting || createOrganization.isPending}
+            >
+              {isSubmitting || createOrganization.isPending
+                ? t('onboarding.creating')
+                : t('onboarding.continue')}
             </Button>
           </form>
         </CardContent>

@@ -1,4 +1,4 @@
-import { useLocale } from '@/i18n/locale-provider'
+import { useLocale } from '@/i18n/use-locale'
 import { quoteStatusLabelKeys } from '@/features/quotes/quote-status-i18n'
 import { cn } from '@/lib/utils'
 import type { QuoteStatus } from '@/features/quotes/quote-status'

@@ -421,6 +421,20 @@ export type Database = {
         Args: { p_payment_id: string }
         Returns: undefined
       }
+      update_payment: {
+        Args: {
+          p_payment_id: string
+          p_amount: number
+          p_method?: PaymentMethod
+          p_paid_at?: string | null
+          p_notes?: string | null
+        }
+        Returns: PaymentRow
+      }
+      seed_demo_data: {
+        Args: Record<string, never>
+        Returns: string
+      }
     }
     Enums: {
       quote_status: QuoteStatus

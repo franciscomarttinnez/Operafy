@@ -1,18 +1,19 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Plus, Trash2 } from 'lucide-react'
 import { useMemo } from 'react'
-import { useFieldArray, useForm, useWatch } from 'react-hook-form'
+import { Controller, useFieldArray, useForm, useWatch } from 'react-hook-form'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { CustomerPicker } from '@/features/customers/components/customer-picker'
 import {
   createQuoteFormSchema,
   toQuoteWriteInput,
   type QuoteFormValues,
   type QuoteWriteInput,
 } from '@/features/quotes/quote-schema'
-import { useLocale } from '@/i18n/locale-provider'
+import { useLocale } from '@/i18n/use-locale'
 import {
   calculateQuoteTotals,
   formatMoney,
@@ -20,10 +21,9 @@ import {
   parseMajorAmountInput,
   toMinorUnits,
 } from '@/lib/money'
-import type { Customer, QuoteDetail } from '@/types/database'
+import type { QuoteDetail } from '@/types/database'
 
 type QuoteFormProps = {
-  customers: Customer[]
   initialQuote?: QuoteDetail | null
   submitLabel: string
   onSubmit: (input: QuoteWriteInput) => Promise<void>
@@ -61,7 +61,6 @@ function toFormValues(quote?: QuoteDetail | null): QuoteFormValues {
 }
 
 export function QuoteForm({
-  customers,
   initialQuote,
   submitLabel,
   onSubmit,
@@ -126,18 +125,18 @@ export function QuoteForm({
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2 sm:col-span-2">
           <Label htmlFor="customerId">{t('quotes.customer')}</Label>
-          <select
-            id="customerId"
-            className="flex h-10 w-full rounded-lg border border-input bg-card px-3 text-sm shadow-sm focus-visible:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
-            {...register('customerId')}
-          >
-            <option value="">{t('quotes.selectCustomer')}</option>
-            {customers.map((customer) => (
-              <option key={customer.id} value={customer.id}>
-                {customer.name}
-              </option>
-            ))}
-          </select>
+          <Controller
+            name="customerId"
+            control={control}
+            render={({ field }) => (
+              <CustomerPicker
+                id="customerId"
+                value={field.value}
+                onChange={field.onChange}
+                selectedCustomer={initialQuote?.customers ?? null}
+              />
+            )}
+          />
           {errors.customerId ? (
             <p className="text-sm text-destructive">{errors.customerId.message}</p>
           ) : null}

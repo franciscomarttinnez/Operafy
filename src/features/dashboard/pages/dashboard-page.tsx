@@ -4,11 +4,13 @@ import { X } from 'lucide-react'
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { QuoteStatusBadge } from '@/features/quotes/components/quote-status-badge'
+import { WorkOrderStatusBadge } from '@/features/work-orders/components/work-order-status-badge'
 import { useOrganization } from '@/features/organizations/use-organization'
-import { usePayments } from '@/features/payments/use-payments'
-import { useQuotes } from '@/features/quotes/use-quotes'
-import { useWorkOrders } from '@/features/work-orders/use-work-orders'
-import { useLocale } from '@/i18n/locale-provider'
+import { usePaidByWorkOrderId } from '@/features/payments/use-payments'
+import { useAllQuotes } from '@/features/quotes/use-quotes'
+import { useAllWorkOrders } from '@/features/work-orders/use-work-orders'
+import { useLocale } from '@/i18n/use-locale'
 import type { MessageKey } from '@/i18n/types'
 import { calculatePaymentBalance, formatMoney } from '@/lib/money'
 import { cn } from '@/lib/utils'
@@ -42,14 +44,16 @@ function todayIsoDate(): string {
 
 export function DashboardPage() {
   const { organization } = useOrganization()
-  const { t } = useLocale()
-  const quotesQuery = useQuotes()
-  const workOrdersQuery = useWorkOrders()
-  const paymentsQuery = usePayments()
+  const { t, locale } = useLocale()
+  const quotesQuery = useAllQuotes()
+  const workOrdersQuery = useAllWorkOrders()
+  const { paidByWorkOrderId, isSuccess: paymentsReady } = usePaidByWorkOrderId()
   const currency = organization?.default_currency ?? 'USD'
+  const moneyLocale = locale === 'es' ? 'es' : 'en'
   const [guideVisible, setGuideVisible] = useState(() => !readGuideHidden())
   const [dismissOpen, setDismissOpen] = useState(false)
   const [dontShowAgain, setDontShowAgain] = useState(false)
+  const today = todayIsoDate()
 
   const pendingQuotes =
     quotesQuery.data?.filter((quote) => quote.status === 'draft' || quote.status === 'sent')
@@ -59,16 +63,10 @@ export function DashboardPage() {
       (job) => job.status === 'pending' || job.status === 'scheduled' || job.status === 'in_progress',
     ).length ?? null
   const jobsToday =
-    workOrdersQuery.data?.filter((job) => job.scheduled_date === todayIsoDate()).length ?? null
-
-  const paidByWorkOrderId: Record<string, number> = {}
-  for (const payment of paymentsQuery.data ?? []) {
-    paidByWorkOrderId[payment.work_order_id] =
-      (paidByWorkOrderId[payment.work_order_id] ?? 0) + payment.amount
-  }
+    workOrdersQuery.data?.filter((job) => job.scheduled_date === today).length ?? null
 
   const outstandingMinor =
-    workOrdersQuery.isSuccess && paymentsQuery.isSuccess
+    workOrdersQuery.isSuccess && paymentsReady
       ? (workOrdersQuery.data ?? [])
           .filter((job) => job.status !== 'cancelled')
           .reduce((sum, job) => {
@@ -80,12 +78,16 @@ export function DashboardPage() {
           }, 0)
       : null
 
+  const recentQuotes = (quotesQuery.data ?? []).slice(0, 5)
+  const todayJobs = (workOrdersQuery.data ?? []).filter((job) => job.scheduled_date === today)
+
   const kpis: Array<{
     labelKey: MessageKey
     hintKey: MessageKey
     tone: keyof typeof toneClass
     value: string
     ready: boolean
+    to: string
   }> = [
     {
       labelKey: 'dashboard.kpi.pendingQuotes',
@@ -93,6 +95,7 @@ export function DashboardPage() {
       tone: 'warning',
       value: pendingQuotes === null ? t('common.emDash') : String(pendingQuotes),
       ready: quotesQuery.isSuccess,
+      to: '/quotes?status=open',
     },
     {
       labelKey: 'dashboard.kpi.activeJobs',
@@ -100,14 +103,18 @@ export function DashboardPage() {
       tone: 'primary',
       value: activeJobs === null ? t('common.emDash') : String(activeJobs),
       ready: workOrdersQuery.isSuccess,
+      to: '/work-orders?status=active',
     },
     {
       labelKey: 'dashboard.kpi.outstanding',
       hintKey: 'dashboard.kpi.outstandingHint',
       tone: 'primary',
       value:
-        outstandingMinor === null ? t('common.emDash') : formatMoney(outstandingMinor, currency),
+        outstandingMinor === null
+          ? t('common.emDash')
+          : formatMoney(outstandingMinor, currency, moneyLocale),
       ready: outstandingMinor !== null,
+      to: '/work-orders?balance=unpaid',
     },
     {
       labelKey: 'dashboard.kpi.jobsToday',
@@ -115,6 +122,7 @@ export function DashboardPage() {
       tone: 'success',
       value: jobsToday === null ? t('common.emDash') : String(jobsToday),
       ready: workOrdersQuery.isSuccess,
+      to: '/work-orders?scheduled=today',
     },
   ]
 
@@ -202,38 +210,125 @@ export function DashboardPage() {
         </label>
       </ConfirmDialog>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         {kpis.map((kpi, index) => (
-          <Card
+          <Link
             key={kpi.labelKey}
-            className={cn(
-              'animate-fade-in-up group hover:-translate-y-0.5 hover:shadow-md',
-              `stagger-${index + 1}`,
-            )}
+            to={kpi.to}
+            className="touch-card block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            aria-label={`${t(kpi.labelKey)} — ${t('dashboard.kpiOpen')}`}
           >
-            <CardHeader className="pb-2">
-              <div className="flex items-center justify-between gap-2">
-                <CardDescription>{t(kpi.labelKey)}</CardDescription>
-                {!kpi.ready ? (
-                  <span
-                    className={cn(
-                      'rounded-full px-2 py-0.5 text-[11px] font-medium',
-                      toneClass[kpi.tone],
-                    )}
-                  >
-                    {t('common.soon')}
-                  </span>
-                ) : null}
-              </div>
-              <CardTitle className="text-3xl font-semibold tracking-tight">{kpi.value}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-xs text-muted-foreground transition-colors group-hover:text-foreground/70">
-                {t(kpi.hintKey)}
-              </p>
-            </CardContent>
-          </Card>
+            <Card
+              className={cn(
+                'group animate-fade-in-up h-full transition-colors active:bg-accent/40 md:transition-all md:hover:-translate-y-0.5 md:hover:border-primary/30 md:hover:shadow-md',
+                `stagger-${index + 1}`,
+              )}
+            >
+              <CardHeader className="space-y-2 p-4 pb-2 sm:p-6 sm:pb-2">
+                <div className="flex items-center justify-between gap-2">
+                  <CardDescription className="text-xs sm:text-sm">{t(kpi.labelKey)}</CardDescription>
+                  {!kpi.ready ? (
+                    <span
+                      className={cn(
+                        'rounded-full px-2 py-0.5 text-[11px] font-medium',
+                        toneClass[kpi.tone],
+                      )}
+                    >
+                      {t('common.soon')}
+                    </span>
+                  ) : (
+                    <span className="text-[11px] font-medium text-primary md:opacity-0 md:transition-opacity md:group-hover:opacity-100">
+                      {t('dashboard.kpiOpen')}
+                    </span>
+                  )}
+                </div>
+                <CardTitle className="text-2xl font-semibold tracking-tight sm:text-3xl">
+                  {kpi.value}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-4 pt-0 sm:p-6 sm:pt-0">
+                <p className="text-xs text-muted-foreground transition-colors group-hover:text-foreground/70">
+                  {t(kpi.hintKey)}
+                </p>
+              </CardContent>
+            </Card>
+          </Link>
         ))}
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card className="animate-fade-in-up">
+          <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
+            <div>
+              <CardTitle className="text-base">{t('dashboard.todayJobs')}</CardTitle>
+              <CardDescription>{t('dashboard.todayJobsHint')}</CardDescription>
+            </div>
+            <Button asChild variant="outline" size="sm">
+              <Link to="/work-orders?scheduled=today">{t('dashboard.viewAll')}</Link>
+            </Button>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {workOrdersQuery.isLoading ? (
+              <p className="text-sm text-muted-foreground">{t('workOrders.loading')}</p>
+            ) : null}
+            {workOrdersQuery.isSuccess && todayJobs.length === 0 ? (
+              <p className="text-sm text-muted-foreground">{t('dashboard.emptyTodayJobs')}</p>
+            ) : null}
+            {todayJobs.map((job) => (
+              <Link
+                key={job.id}
+                to={`/work-orders/${job.id}`}
+                className="flex items-center justify-between gap-3 rounded-lg border border-border p-3 transition-colors hover:bg-accent/50"
+              >
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-foreground">{job.title}</p>
+                  <p className="truncate text-xs text-muted-foreground">
+                    {job.customers?.name ?? t('common.emDash')}
+                  </p>
+                </div>
+                <WorkOrderStatusBadge status={job.status} />
+              </Link>
+            ))}
+          </CardContent>
+        </Card>
+
+        <Card className="animate-fade-in-up">
+          <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
+            <div>
+              <CardTitle className="text-base">{t('dashboard.recentQuotes')}</CardTitle>
+              <CardDescription>{t('dashboard.recentQuotesHint')}</CardDescription>
+            </div>
+            <Button asChild variant="outline" size="sm">
+              <Link to="/quotes">{t('dashboard.viewAll')}</Link>
+            </Button>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {quotesQuery.isLoading ? (
+              <p className="text-sm text-muted-foreground">{t('quotes.loading')}</p>
+            ) : null}
+            {quotesQuery.isSuccess && recentQuotes.length === 0 ? (
+              <p className="text-sm text-muted-foreground">{t('dashboard.emptyQuotes')}</p>
+            ) : null}
+            {recentQuotes.map((quote) => (
+              <Link
+                key={quote.id}
+                to={`/quotes/${quote.id}`}
+                className="flex items-center justify-between gap-3 rounded-lg border border-border p-3 transition-colors hover:bg-accent/50"
+              >
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-foreground">
+                    {quote.quote_number}
+                  </p>
+                  <p className="truncate text-xs text-muted-foreground">
+                    {quote.customers?.name ?? t('common.emDash')} ·{' '}
+                    {formatMoney(quote.total, currency, moneyLocale)}
+                  </p>
+                </div>
+                <QuoteStatusBadge status={quote.status} />
+              </Link>
+            ))}
+          </CardContent>
+        </Card>
       </div>
     </div>
   )

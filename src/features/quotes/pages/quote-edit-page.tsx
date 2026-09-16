@@ -3,18 +3,16 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { QuoteForm } from '@/features/quotes/components/quote-form'
-import { useCustomers } from '@/features/customers/use-customers'
 import { useOrganization } from '@/features/organizations/use-organization'
 import { useQuote, useUpdateQuote } from '@/features/quotes/use-quotes'
 import { isQuoteEditable } from '@/features/quotes/quote-status'
-import { useLocale } from '@/i18n/locale-provider'
+import { useLocale } from '@/i18n/use-locale'
 import { getErrorMessage } from '@/lib/errors'
 
 export function QuoteEditPage() {
   const { quoteId } = useParams<{ quoteId: string }>()
   const navigate = useNavigate()
   const quoteQuery = useQuote(quoteId)
-  const customersQuery = useCustomers('')
   const updateQuote = useUpdateQuote(quoteId ?? '')
   const { organization } = useOrganization()
   const { t } = useLocale()
@@ -24,7 +22,7 @@ export function QuoteEditPage() {
     return <p className="text-sm text-destructive">{t('quotes.missingId')}</p>
   }
 
-  if (quoteQuery.isLoading || customersQuery.isLoading) {
+  if (quoteQuery.isLoading) {
     return (
       <Card>
         <CardContent className="py-10 text-center text-sm text-muted-foreground">
@@ -99,7 +97,6 @@ export function QuoteEditPage() {
         <CardContent>
           {formError ? <p className="mb-4 text-sm text-destructive">{formError}</p> : null}
           <QuoteForm
-            customers={customersQuery.data ?? []}
             initialQuote={quoteQuery.data}
             currencyCode={organization?.default_currency ?? 'USD'}
             submitLabel={t('quotes.saveChanges')}

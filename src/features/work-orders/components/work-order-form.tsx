@@ -1,10 +1,12 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMemo } from 'react'
-import { useForm } from 'react-hook-form'
+import { Controller, useForm } from 'react-hook-form'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { CustomerPicker } from '@/features/customers/components/customer-picker'
+import { useCustomer } from '@/features/customers/use-customers'
 import {
   createWorkOrderFormSchema,
   toWorkOrderUpdateInput,
@@ -13,12 +15,11 @@ import {
   type WorkOrderUpdateInput,
   type WorkOrderWriteInput,
 } from '@/features/work-orders/work-order-schema'
-import { useLocale } from '@/i18n/locale-provider'
+import { useLocale } from '@/i18n/use-locale'
 import { formatMoney, fromMinorUnits } from '@/lib/money'
-import type { Customer, WorkOrderWithCustomer } from '@/types/database'
+import type { WorkOrderWithCustomer } from '@/types/database'
 
 type WorkOrderFormProps = {
-  customers: Customer[]
   initialWorkOrder?: WorkOrderWithCustomer | null
   submitLabel: string
   onCancel: () => void
@@ -54,7 +55,6 @@ function toFormValues(
 }
 
 export function WorkOrderForm({
-  customers,
   initialWorkOrder,
   submitLabel,
   onCancel,
@@ -67,9 +67,13 @@ export function WorkOrderForm({
   const schema = useMemo(() => createWorkOrderFormSchema(t), [t])
   const hasQuote = Boolean(initialWorkOrder?.quote_id)
   const customerLocked = Boolean(lockCustomerId || initialWorkOrder)
+  const lockedCustomerQuery = useCustomer(
+    customerLocked && !initialWorkOrder ? lockCustomerId : undefined,
+  )
 
   const {
     register,
+    control,
     handleSubmit,
     formState: { errors, isSubmitting },
   } = useForm<WorkOrderFormValues>({
@@ -102,24 +106,24 @@ export function WorkOrderForm({
               id="customerId"
               disabled
               value={
-                customers.find((customer) => customer.id === (lockCustomerId ?? initialWorkOrder?.customer_id))
-                  ?.name ?? t('common.emDash')
+                initialWorkOrder?.customers?.name ??
+                lockedCustomerQuery.data?.name ??
+                t('common.emDash')
               }
             />
           </>
         ) : (
-          <select
-            id="customerId"
-            className="flex h-10 w-full rounded-lg border border-input bg-card px-3 text-sm shadow-sm focus-visible:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
-            {...register('customerId')}
-          >
-            <option value="">{t('workOrders.selectCustomer')}</option>
-            {customers.map((customer) => (
-              <option key={customer.id} value={customer.id}>
-                {customer.name}
-              </option>
-            ))}
-          </select>
+          <Controller
+            name="customerId"
+            control={control}
+            render={({ field }) => (
+              <CustomerPicker
+                id="customerId"
+                value={field.value}
+                onChange={field.onChange}
+              />
+            )}
+          />
         )}
         {errors.customerId ? (
           <p className="text-sm text-destructive">{errors.customerId.message}</p>

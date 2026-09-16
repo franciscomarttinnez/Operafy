@@ -14,6 +14,8 @@ import { CustomerNewPage } from '@/features/customers/pages/customer-new-page'
 import { CustomersListPage } from '@/features/customers/pages/customers-list-page'
 import { DashboardPage } from '@/features/dashboard/pages/dashboard-page'
 import { OnboardingPage } from '@/features/organizations/pages/onboarding-page'
+import { SettingsPage } from '@/features/organizations/pages/settings-page'
+import { PaymentEditPage } from '@/features/payments/pages/payment-edit-page'
 import { PaymentNewPage } from '@/features/payments/pages/payment-new-page'
 import { PaymentsListPage } from '@/features/payments/pages/payments-list-page'
 import { QuoteDetailPage } from '@/features/quotes/pages/quote-detail-page'
@@ -73,6 +75,8 @@ function AppRoutes() {
           <Route path="/work-orders/:workOrderId/edit" element={<WorkOrderEditPage />} />
           <Route path="/payments" element={<PaymentsListPage />} />
           <Route path="/payments/new" element={<PaymentNewPage />} />
+          <Route path="/payments/:paymentId/edit" element={<PaymentEditPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
         </Route>
       </Route>
 

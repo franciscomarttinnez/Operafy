@@ -2,13 +2,13 @@ import { Link, Outlet } from 'react-router-dom'
 import { BrandMark } from '@/components/brand-mark'
 import { PreferencesToggles } from '@/components/preferences-toggles'
 import { Card, CardContent } from '@/components/ui/card'
-import { useLocale } from '@/i18n/locale-provider'
+import { useLocale } from '@/i18n/use-locale'
 
 export function AuthShell() {
   const { t } = useLocale()
 
   return (
-    <div className="relative flex min-h-svh items-center justify-center overflow-hidden bg-background px-4 py-10">
+    <div className="relative flex min-h-svh items-center justify-center overflow-hidden bg-background px-4 py-10 pt-[max(2.5rem,env(safe-area-inset-top))] pb-[max(2.5rem,env(safe-area-inset-bottom))]">
       <div
         aria-hidden
         className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(37,99,235,0.12),_transparent_55%)]"

@@ -10,7 +10,7 @@ import {
   type CustomerFormValues,
   type CustomerWriteInput,
 } from '@/features/customers/customer-schema'
-import { useLocale } from '@/i18n/locale-provider'
+import { useLocale } from '@/i18n/use-locale'
 import type { Customer } from '@/types/database'
 
 type CustomerFormProps = {
