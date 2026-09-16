@@ -6,6 +6,7 @@ Operafy is a browser SaaS that helps independent operators (HVAC, plumbing, clea
 
 Built as a **finishable solo junior / student portfolio project**: real workflow, real multi-tenant security, careful money handling — without enterprise bloat.
 
+LIVE DEMO: https://operafy.netlify.app
 ---
 
 ## Who it is for
