@@ -155,6 +155,24 @@ export const en = {
   'settings.demoLoading': 'Loading demo…',
   'settings.demoLoaded': 'Demo data loaded.',
   'settings.demoError': 'Could not load demo data. Run migration 010 first.',
+  'settings.demoClear': 'Remove demo data',
+  'settings.demoClearing': 'Removing demo…',
+  'settings.demoCleared': 'Demo data removed.',
+  'settings.demoClearError': 'Could not remove demo data. Run migration 012 first.',
+  'settings.demoClearConfirmTitle': 'Remove demo data?',
+  'settings.demoClearConfirmBody':
+    'Deletes only rows marked as [Demo] (customers, related quotes, jobs, and payments). Your real data stays.',
+  'settings.wipeTitle': 'Reset account data',
+  'settings.wipeHint':
+    'Deletes every customer, quote, job, and payment for this business. Keeps your login and business profile.',
+  'settings.wipe': 'Delete all data',
+  'settings.wiping': 'Deleting…',
+  'settings.wiped': 'Account data cleared.',
+  'settings.wipeError': 'Could not wipe data. Run migration 012 first.',
+  'settings.wipeConfirmTitle': 'Delete all business data?',
+  'settings.wipeConfirmBody':
+    'This permanently deletes all customers, quotes, jobs, and payments. Your account and business settings stay. This cannot be undone.',
+  'settings.wipeConfirmLabel': 'Delete everything',
 
   'quotes.filterOpen': 'Pending',
   'workOrders.filterActive': 'Active',
@@ -226,13 +244,15 @@ export const en = {
   'customers.deleteConfirm': 'Delete {name}? This cannot be undone.',
   'customers.deleteError': 'Could not delete customer.',
   'customers.deleteBlockedQuotes':
-    'This customer has quotes. Delete those quotes first, then try again.',
+    'This customer has quotes. Delete draft/rejected quotes first (sent/accepted quotes keep history).',
   'customers.deleteBlockedJobs':
-    'This customer has work orders. Delete those jobs first, then try again.',
+    'This customer has work orders. Cancel/delete those jobs first (after removing their payments), then try again.',
   'customers.deleteBlockedPayments':
-    'This customer has payments. Delete those payments first, then try again.',
+    'This customer has payments. Delete those payments first, then remove jobs and quotes, then the customer.',
   'customers.deleteBlockedRelated':
-    'This customer has related quotes, jobs, or payments. Remove them first, then try again.',
+    'Cleanup order: payments → jobs → draft/rejected quotes → customer. Sent/accepted quotes with history cannot be wiped.',
+  'customers.deleteHint':
+    'Customers with business history stay in the system. Remove payments, then jobs, then draft/rejected quotes before deleting.',
   'customers.overview': 'Overview',
   'customers.overviewHint': 'Contact and notes for this customer.',
   'customers.name': 'Name',
@@ -280,11 +300,14 @@ export const en = {
   'quotes.saveChanges': 'Save changes',
   'quotes.createError': 'Could not create quote.',
   'quotes.updateError': 'Could not update quote.',
-  'quotes.deleteConfirm': 'Delete draft quote {number}? This cannot be undone.',
+  'quotes.deleteConfirm': 'Delete quote {number}? This cannot be undone.',
   'quotes.rejectConfirm': 'Mark quote {number} as rejected?',
   'quotes.deleteError': 'Could not delete quote.',
+  'quotes.deleteBlocked': 'Only draft or rejected quotes can be deleted (and only if they have no linked jobs).',
+  'quotes.deleteBlockedJobs': 'This quote has linked work orders. Delete those jobs first.',
   'quotes.statusError': 'Could not update status.',
   'quotes.onlyDraftEditable': 'Only draft quotes can be edited',
+  'quotes.onlyDraftDeletable': 'Only draft or rejected quotes can be deleted',
   'quotes.needCustomerTitle': 'Add a customer first',
   'quotes.needCustomerBody': 'Quotes need a customer before you can price the work.',
   'quotes.colQuote': 'Quote',
@@ -356,6 +379,9 @@ export const en = {
   'workOrders.deleteConfirm': 'Delete work order “{title}”? This cannot be undone.',
   'workOrders.cancelConfirm': 'Cancel work order “{title}”?',
   'workOrders.deleteError': 'Could not delete work order.',
+  'workOrders.deleteBlocked': 'Only pending or cancelled jobs can be deleted.',
+  'workOrders.deleteBlockedPayments':
+    'This job has payments. Delete those payments first, then try again.',
   'workOrders.statusError': 'Could not update status.',
   'workOrders.onlyOpenEditable': 'Completed or cancelled work orders cannot be edited',
   'workOrders.needCustomerTitle': 'Add a customer first',

@@ -32,3 +32,7 @@ export function getAvailableQuoteTransitions(from: QuoteStatus): QuoteStatus[] {
 export function isQuoteEditable(status: QuoteStatus): boolean {
   return status === 'draft'
 }
+
+export function isQuoteDeletable(status: QuoteStatus): boolean {
+  return status === 'draft' || status === 'rejected'
+}

@@ -1,15 +1,17 @@
-import { Plus } from 'lucide-react'
+import { Plus, Trash2 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
+import { ConfirmDialog } from '@/components/confirm-dialog'
 import { ListFilters } from '@/components/list-filters'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { PAYMENT_METHODS, type PaymentMethod } from '@/features/payments/payment-method'
 import { paymentMethodLabelKeys } from '@/features/payments/payment-method-i18n'
-import { usePayments } from '@/features/payments/use-payments'
+import { useDeletePayment, usePayments } from '@/features/payments/use-payments'
 import { useOrganization } from '@/features/organizations/use-organization'
 import { useDebouncedValue } from '@/hooks/use-debounced-value'
 import { useLocale } from '@/i18n/use-locale'
+import { getErrorMessage } from '@/lib/errors'
 import { formatMoney } from '@/lib/money'
 import { matchesSearchQuery } from '@/lib/search'
 
@@ -22,6 +24,7 @@ function parsePaymentMethod(value: string | null): PaymentMethod | 'all' {
 
 export function PaymentsListPage() {
   const paymentsQuery = usePayments()
+  const deletePayment = useDeletePayment()
   const { organization } = useOrganization()
   const { t, locale } = useLocale()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -30,6 +33,8 @@ export function PaymentsListPage() {
   const methodFilter = parsePaymentMethod(searchParams.get('method'))
   const currency = organization?.default_currency ?? 'USD'
   const moneyLocale = locale === 'es' ? 'es' : 'en'
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
 
   const filteredPayments = useMemo(() => {
     const rows = paymentsQuery.data ?? []
@@ -89,6 +94,8 @@ export function PaymentsListPage() {
           ]}
         />
       ) : null}
+
+      {actionError ? <p className="text-sm text-destructive">{actionError}</p> : null}
 
       {paymentsQuery.isLoading ? (
         <Card>
@@ -158,14 +165,28 @@ export function PaymentsListPage() {
                     <Button asChild variant="outline" size="sm" className="w-full">
                       <Link to={`/payments/${payment.id}/edit`}>{t('payments.edit')}</Link>
                     </Button>
-                    {payment.work_orders?.id ? (
-                      <Button asChild variant="outline" size="sm" className="w-full">
-                        <Link to={`/work-orders/${payment.work_orders.id}`}>
-                          {t('workOrders.backToJob')}
-                        </Link>
-                      </Button>
-                    ) : null}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="w-full text-destructive hover:bg-destructive/10 hover:text-destructive"
+                      disabled={deletePayment.isPending}
+                      onClick={() => {
+                        setActionError(null)
+                        setPendingDeleteId(payment.id)
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      {t('common.delete')}
+                    </Button>
                   </div>
+                  {payment.work_orders?.id ? (
+                    <Button asChild variant="ghost" size="sm" className="w-full">
+                      <Link to={`/work-orders/${payment.work_orders.id}`}>
+                        {t('workOrders.backToJob')}
+                      </Link>
+                    </Button>
+                  ) : null}
                 </CardContent>
               </Card>
             ))}
@@ -173,7 +194,7 @@ export function PaymentsListPage() {
 
           <Card className="hidden overflow-hidden md:block">
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[800px] text-left text-sm">
+              <table className="w-full min-w-[880px] text-left text-sm">
                 <thead className="border-b bg-muted/50 text-muted-foreground">
                   <tr>
                     <th className="px-4 py-3 font-medium">{t('payments.colDate')}</th>
@@ -182,6 +203,7 @@ export function PaymentsListPage() {
                     <th className="px-4 py-3 font-medium">{t('payments.colMethod')}</th>
                     <th className="px-4 py-3 font-medium">{t('payments.colAmount')}</th>
                     <th className="px-4 py-3 font-medium">{t('common.edit')}</th>
+                    <th className="px-4 py-3 font-medium">{t('common.delete')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -231,6 +253,22 @@ export function PaymentsListPage() {
                           {t('payments.edit')}
                         </Link>
                       </td>
+                      <td className="px-4 py-3">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                          disabled={deletePayment.isPending}
+                          onClick={() => {
+                            setActionError(null)
+                            setPendingDeleteId(payment.id)
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                          {t('common.delete')}
+                        </Button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -241,6 +279,31 @@ export function PaymentsListPage() {
           <p className="text-xs text-muted-foreground">{t('payments.showingUpTo')}</p>
         </>
       ) : null}
+
+      <ConfirmDialog
+        open={pendingDeleteId !== null}
+        title={t('common.delete')}
+        description={t('payments.deleteConfirm')}
+        confirmLabel={deletePayment.isPending ? t('common.deleting') : t('common.delete')}
+        destructive
+        busy={deletePayment.isPending}
+        onCancel={() => setPendingDeleteId(null)}
+        onConfirm={() => {
+          if (!pendingDeleteId) {
+            return
+          }
+          const id = pendingDeleteId
+          setActionError(null)
+          void deletePayment
+            .mutateAsync(id)
+            .then(() => setPendingDeleteId(null))
+            .catch((error: unknown) => {
+              console.error(error)
+              setPendingDeleteId(null)
+              setActionError(getErrorMessage(error, t('payments.deleteError')))
+            })
+        }}
+      />
     </div>
   )
 }

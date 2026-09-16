@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { Link } from 'react-router-dom'
 import { z } from 'zod'
+import { ConfirmDialog } from '@/components/confirm-dialog'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -12,6 +13,7 @@ import {
   useUpdateOrganization,
 } from '@/features/organizations/use-organization'
 import { useLocale } from '@/i18n/use-locale'
+import type { MessageKey } from '@/i18n/types'
 import { getErrorMessage } from '@/lib/errors'
 import { getSupabaseClient } from '@/lib/supabase'
 import { useQueryClient } from '@tanstack/react-query'
@@ -24,6 +26,8 @@ type SettingsValues = {
   defaultCurrency: string
 }
 
+type DataRpcName = 'seed_demo_data' | 'clear_demo_data' | 'wipe_organization_data'
+
 export function SettingsPage() {
   const { organization, isLoading } = useOrganization()
   const updateOrganization = useUpdateOrganization()
@@ -31,9 +35,11 @@ export function SettingsPage() {
   const { t } = useLocale()
   const [formError, setFormError] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
-  const [seedMessage, setSeedMessage] = useState<string | null>(null)
-  const [seedError, setSeedError] = useState<string | null>(null)
-  const [seedBusy, setSeedBusy] = useState(false)
+  const [dataMessage, setDataMessage] = useState<string | null>(null)
+  const [dataError, setDataError] = useState<string | null>(null)
+  const [dataBusy, setDataBusy] = useState(false)
+  const [clearDemoOpen, setClearDemoOpen] = useState(false)
+  const [wipeOpen, setWipeOpen] = useState(false)
 
   const schema = useMemo(
     () =>
@@ -97,6 +103,30 @@ export function SettingsPage() {
       setFormError(getErrorMessage(error, t('settings.saveError')))
     }
   })
+
+  const runDataRpc = async (
+    rpcName: DataRpcName,
+    fallbackSuccessKey: MessageKey,
+    fallbackErrorKey: MessageKey,
+  ) => {
+    setDataError(null)
+    setDataMessage(null)
+    setDataBusy(true)
+    try {
+      const supabase = getSupabaseClient()
+      const { data, error } = await supabase.rpc(rpcName)
+      if (error) {
+        throw error
+      }
+      setDataMessage(typeof data === 'string' ? data : t(fallbackSuccessKey))
+      await queryClient.invalidateQueries()
+    } catch (error) {
+      console.error(error)
+      setDataError(getErrorMessage(error, t(fallbackErrorKey)))
+    } finally {
+      setDataBusy(false)
+    }
+  }
 
   if (isLoading) {
     return (
@@ -192,40 +222,91 @@ export function SettingsPage() {
           <CardDescription>{t('settings.demoHint')}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
-          {seedError ? <p className="text-sm text-destructive">{seedError}</p> : null}
-          {seedMessage ? <p className="text-sm text-success">{seedMessage}</p> : null}
+          {dataError ? <p className="text-sm text-destructive">{dataError}</p> : null}
+          {dataMessage ? <p className="text-sm text-success">{dataMessage}</p> : null}
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={dataBusy}
+              onClick={() => {
+                void runDataRpc('seed_demo_data', 'settings.demoLoaded', 'settings.demoError')
+              }}
+            >
+              {dataBusy ? t('settings.demoLoading') : t('settings.demoLoad')}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={dataBusy}
+              onClick={() => {
+                setDataError(null)
+                setDataMessage(null)
+                setClearDemoOpen(true)
+              }}
+            >
+              {t('settings.demoClear')}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="border-destructive/30">
+        <CardHeader>
+          <CardTitle>{t('settings.wipeTitle')}</CardTitle>
+          <CardDescription>{t('settings.wipeHint')}</CardDescription>
+        </CardHeader>
+        <CardContent>
           <Button
             type="button"
-            variant="outline"
-            disabled={seedBusy}
+            variant="destructive"
+            disabled={dataBusy}
             onClick={() => {
-              setSeedError(null)
-              setSeedMessage(null)
-              setSeedBusy(true)
-              void (async () => {
-                try {
-                  const supabase = getSupabaseClient()
-                  const { data, error } = await supabase.rpc('seed_demo_data')
-                  if (error) {
-                    throw error
-                  }
-                  setSeedMessage(
-                    typeof data === 'string' ? data : t('settings.demoLoaded'),
-                  )
-                  await queryClient.invalidateQueries()
-                } catch (error) {
-                  console.error(error)
-                  setSeedError(getErrorMessage(error, t('settings.demoError')))
-                } finally {
-                  setSeedBusy(false)
-                }
-              })()
+              setDataError(null)
+              setDataMessage(null)
+              setWipeOpen(true)
             }}
           >
-            {seedBusy ? t('settings.demoLoading') : t('settings.demoLoad')}
+            {t('settings.wipe')}
           </Button>
         </CardContent>
       </Card>
+
+      <ConfirmDialog
+        open={clearDemoOpen}
+        title={t('settings.demoClearConfirmTitle')}
+        description={t('settings.demoClearConfirmBody')}
+        confirmLabel={dataBusy ? t('settings.demoClearing') : t('settings.demoClear')}
+        destructive
+        busy={dataBusy}
+        onCancel={() => setClearDemoOpen(false)}
+        onConfirm={() => {
+          setClearDemoOpen(false)
+          void runDataRpc(
+            'clear_demo_data',
+            'settings.demoCleared',
+            'settings.demoClearError',
+          )
+        }}
+      />
+
+      <ConfirmDialog
+        open={wipeOpen}
+        title={t('settings.wipeConfirmTitle')}
+        description={t('settings.wipeConfirmBody')}
+        confirmLabel={dataBusy ? t('settings.wiping') : t('settings.wipeConfirmLabel')}
+        destructive
+        busy={dataBusy}
+        onCancel={() => setWipeOpen(false)}
+        onConfirm={() => {
+          setWipeOpen(false)
+          void runDataRpc(
+            'wipe_organization_data',
+            'settings.wiped',
+            'settings.wipeError',
+          )
+        }}
+      />
     </div>
   )
 }

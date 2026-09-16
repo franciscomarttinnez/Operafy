@@ -159,6 +159,24 @@ export const es: Messages = {
   'settings.demoLoading': 'Cargando demo…',
   'settings.demoLoaded': 'Datos demo cargados.',
   'settings.demoError': 'No se pudieron cargar los datos demo. Corré la migración 010 primero.',
+  'settings.demoClear': 'Eliminar datos demo',
+  'settings.demoClearing': 'Eliminando demo…',
+  'settings.demoCleared': 'Datos demo eliminados.',
+  'settings.demoClearError': 'No se pudieron eliminar los datos demo. Corré la migración 012 primero.',
+  'settings.demoClearConfirmTitle': '¿Eliminar datos demo?',
+  'settings.demoClearConfirmBody':
+    'Borra solo filas marcadas como [Demo] (clientes y sus cotizaciones, trabajos y pagos). Tus datos reales se quedan.',
+  'settings.wipeTitle': 'Resetear datos de la cuenta',
+  'settings.wipeHint':
+    'Elimina todos los clientes, cotizaciones, trabajos y pagos de este negocio. Conserva el login y el perfil del negocio.',
+  'settings.wipe': 'Eliminar todos los datos',
+  'settings.wiping': 'Eliminando…',
+  'settings.wiped': 'Datos de la cuenta borrados.',
+  'settings.wipeError': 'No se pudieron borrar los datos. Corré la migración 012 primero.',
+  'settings.wipeConfirmTitle': '¿Eliminar todos los datos del negocio?',
+  'settings.wipeConfirmBody':
+    'Esto borra de forma permanente todos los clientes, cotizaciones, trabajos y pagos. Tu cuenta y la configuración del negocio se mantienen. No se puede deshacer.',
+  'settings.wipeConfirmLabel': 'Eliminar todo',
 
   'quotes.filterOpen': 'Pendientes',
   'workOrders.filterActive': 'Activas',
@@ -232,13 +250,15 @@ export const es: Messages = {
   'customers.deleteConfirm': '¿Eliminar a {name}? Esta acción no se puede deshacer.',
   'customers.deleteError': 'No se pudo eliminar el cliente.',
   'customers.deleteBlockedQuotes':
-    'Este cliente tiene cotizaciones. Eliminalas primero e intentá de nuevo.',
+    'Este cliente tiene cotizaciones. Eliminá primero las de borrador/rechazadas (enviadas/aceptadas conservan historial).',
   'customers.deleteBlockedJobs':
-    'Este cliente tiene órdenes de trabajo. Eliminalas primero e intentá de nuevo.',
+    'Este cliente tiene trabajos. Cancelá/eliminá esos trabajos primero (después de borrar sus pagos) e intentá de nuevo.',
   'customers.deleteBlockedPayments':
-    'Este cliente tiene pagos. Eliminalos primero e intentá de nuevo.',
+    'Este cliente tiene pagos. Eliminá esos pagos primero, luego trabajos y cotizaciones, y después el cliente.',
   'customers.deleteBlockedRelated':
-    'Este cliente tiene cotizaciones, trabajos o pagos relacionados. Eliminalos primero e intentá de nuevo.',
+    'Orden de limpieza: pagos → trabajos → cotizaciones borrador/rechazadas → cliente. Las enviadas/aceptadas con historial no se borran.',
+  'customers.deleteHint':
+    'Los clientes con historial se quedan en el sistema. Sacá pagos, luego trabajos, luego cotizaciones borrador/rechazadas antes de eliminar.',
   'customers.overview': 'Resumen',
   'customers.overviewHint': 'Contacto y notas de este cliente.',
   'customers.name': 'Nombre',
@@ -288,11 +308,16 @@ export const es: Messages = {
   'quotes.createError': 'No se pudo crear la cotización.',
   'quotes.updateError': 'No se pudo actualizar la cotización.',
   'quotes.deleteConfirm':
-    '¿Eliminar el borrador {number}? Esta acción no se puede deshacer.',
+    '¿Eliminar la cotización {number}? Esta acción no se puede deshacer.',
   'quotes.rejectConfirm': '¿Marcar la cotización {number} como rechazada?',
   'quotes.deleteError': 'No se pudo eliminar la cotización.',
+  'quotes.deleteBlocked':
+    'Solo se pueden eliminar cotizaciones en borrador o rechazadas (y sin trabajos vinculados).',
+  'quotes.deleteBlockedJobs':
+    'Esta cotización tiene trabajos vinculados. Eliminá esos trabajos primero.',
   'quotes.statusError': 'No se pudo actualizar el estado.',
   'quotes.onlyDraftEditable': 'Solo se pueden editar cotizaciones en borrador',
+  'quotes.onlyDraftDeletable': 'Solo se pueden eliminar cotizaciones en borrador o rechazadas',
   'quotes.needCustomerTitle': 'Agregá un cliente primero',
   'quotes.needCustomerBody':
     'Las cotizaciones necesitan un cliente antes de poder cotizar el trabajo.',
@@ -369,6 +394,9 @@ export const es: Messages = {
     '¿Eliminar la orden de trabajo “{title}”? Esta acción no se puede deshacer.',
   'workOrders.cancelConfirm': '¿Cancelar la orden de trabajo “{title}”?',
   'workOrders.deleteError': 'No se pudo eliminar la orden de trabajo.',
+  'workOrders.deleteBlocked': 'Solo se pueden eliminar trabajos pendientes o cancelados.',
+  'workOrders.deleteBlockedPayments':
+    'Este trabajo tiene pagos. Eliminá esos pagos primero e intentá de nuevo.',
   'workOrders.statusError': 'No se pudo actualizar el estado.',
   'workOrders.onlyOpenEditable':
     'No se pueden editar órdenes de trabajo completadas o canceladas',

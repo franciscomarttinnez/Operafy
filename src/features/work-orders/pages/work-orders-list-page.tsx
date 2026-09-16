@@ -1,20 +1,23 @@
-import { ArrowDown, ArrowUp, ArrowUpDown, Plus } from 'lucide-react'
+import { ArrowDown, ArrowUp, ArrowUpDown, Plus, Trash2 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
+import { ConfirmDialog } from '@/components/confirm-dialog'
 import { ListFilters } from '@/components/list-filters'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { WorkOrderStatusBadge } from '@/features/work-orders/components/work-order-status-badge'
 import { workOrderStatusLabelKeys } from '@/features/work-orders/work-order-status-i18n'
 import {
+  isWorkOrderDeletable,
   WORK_ORDER_STATUSES,
   type WorkOrderStatus,
 } from '@/features/work-orders/work-order-status'
-import { useWorkOrders } from '@/features/work-orders/use-work-orders'
+import { useDeleteWorkOrder, useWorkOrders } from '@/features/work-orders/use-work-orders'
 import { usePaidByWorkOrderId } from '@/features/payments/use-payments'
 import { useOrganization } from '@/features/organizations/use-organization'
 import { useDebouncedValue } from '@/hooks/use-debounced-value'
 import { useLocale } from '@/i18n/use-locale'
+import { getErrorMessage } from '@/lib/errors'
 import { calculatePaymentBalance, formatMoney } from '@/lib/money'
 import { matchesSearchQuery } from '@/lib/search'
 import { cn } from '@/lib/utils'
@@ -231,6 +234,7 @@ function SortHeaderButton({
 
 export function WorkOrdersListPage() {
   const workOrdersQuery = useWorkOrders()
+  const deleteWorkOrder = useDeleteWorkOrder()
   const {
     paidByWorkOrderId,
     isLoading: paymentsLoading,
@@ -241,6 +245,8 @@ export function WorkOrdersListPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [searchInput, setSearchInput] = useState(searchParams.get('q') ?? '')
   const [sort, setSort] = useState<SortState | null>(null)
+  const [pendingDelete, setPendingDelete] = useState<{ id: string; title: string } | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
   const search = useDebouncedValue(searchInput, 250)
   const statusFilter = parseWorkOrderFilter(searchParams.get('status'))
   const balanceFilter: BalanceFilter =
@@ -321,6 +327,18 @@ export function WorkOrdersListPage() {
     return 'cycle'
   }
 
+  const mapDeleteError = (error: unknown) => {
+    const message = getErrorMessage(error, t('workOrders.deleteError'))
+    const lower = message.toLowerCase()
+    if (lower.includes('payment')) {
+      return t('workOrders.deleteBlockedPayments')
+    }
+    if (lower.includes('pending') || lower.includes('cancelled') || lower.includes('only')) {
+      return t('workOrders.deleteBlocked')
+    }
+    return message
+  }
+
   return (
     <div className="animate-fade-in-up space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
@@ -370,6 +388,8 @@ export function WorkOrdersListPage() {
           </button>
         </ListFilters>
       ) : null}
+
+      {actionError ? <p className="text-sm text-destructive">{actionError}</p> : null}
 
       {workOrdersQuery.isLoading ||
       (balanceFilter === 'unpaid' && paymentsLoading) ? (
@@ -479,14 +499,18 @@ export function WorkOrdersListPage() {
                 job.billable_amount,
                 paidByWorkOrderId[job.id] ?? 0,
               ).balanceMinor
+              const hasPayments = (paidByWorkOrderId[job.id] ?? 0) > 0
+              const canDelete = isWorkOrderDeletable(job.status) && !hasPayments
               return (
-                <Link
+                <Card
                   key={job.id}
-                  to={`/work-orders/${job.id}`}
-                  className="touch-card block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="transition-colors active:bg-accent/50 md:transition-all md:hover:-translate-y-0.5 md:hover:shadow-md"
                 >
-                  <Card className="transition-colors active:bg-accent/50 md:transition-all md:hover:-translate-y-0.5 md:hover:shadow-md">
-                    <CardContent className="space-y-2 p-4">
+                  <CardContent className="space-y-3 p-4">
+                    <Link
+                      to={`/work-orders/${job.id}`}
+                      className="touch-card block space-y-2 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
                           <p className="font-medium text-foreground">{job.title}</p>
@@ -507,9 +531,25 @@ export function WorkOrdersListPage() {
                           {formatMoney(Math.max(balance, 0), currency, moneyLocale)}
                         </p>
                       </div>
-                    </CardContent>
-                  </Card>
-                </Link>
+                    </Link>
+                    {canDelete ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="w-full text-destructive hover:bg-destructive/10 hover:text-destructive"
+                        disabled={deleteWorkOrder.isPending}
+                        onClick={() => {
+                          setActionError(null)
+                          setPendingDelete({ id: job.id, title: job.title })
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        {t('common.delete')}
+                      </Button>
+                    ) : null}
+                  </CardContent>
+                </Card>
               )
             })}
           </div>
@@ -553,6 +593,7 @@ export function WorkOrdersListPage() {
                         onClick={() => setSort((current) => nextSortState(current, 'balance'))}
                       />
                     </th>
+                    <th className="px-4 py-3 font-medium">{t('common.delete')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -561,6 +602,8 @@ export function WorkOrdersListPage() {
                       job.billable_amount,
                       paidByWorkOrderId[job.id] ?? 0,
                     ).balanceMinor
+                    const hasPayments = (paidByWorkOrderId[job.id] ?? 0) > 0
+                    const canDelete = isWorkOrderDeletable(job.status) && !hasPayments
                     return (
                       <tr
                         key={job.id}
@@ -594,6 +637,26 @@ export function WorkOrdersListPage() {
                         <td className="px-4 py-3 font-medium">
                           {formatMoney(Math.max(balance, 0), currency, moneyLocale)}
                         </td>
+                        <td className="px-4 py-3">
+                          {canDelete ? (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                              disabled={deleteWorkOrder.isPending}
+                              onClick={() => {
+                                setActionError(null)
+                                setPendingDelete({ id: job.id, title: job.title })
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                              {t('common.delete')}
+                            </Button>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">{t('common.emDash')}</span>
+                          )}
+                        </td>
                       </tr>
                     )
                   })}
@@ -605,6 +668,31 @@ export function WorkOrdersListPage() {
           <p className="text-xs text-muted-foreground">{t('workOrders.showingUpTo')}</p>
         </>
       ) : null}
+
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        title={t('common.delete')}
+        description={t('workOrders.deleteConfirm', { title: pendingDelete?.title ?? '' })}
+        confirmLabel={deleteWorkOrder.isPending ? t('common.deleting') : t('common.delete')}
+        destructive
+        busy={deleteWorkOrder.isPending}
+        onCancel={() => setPendingDelete(null)}
+        onConfirm={() => {
+          if (!pendingDelete) {
+            return
+          }
+          const target = pendingDelete
+          setActionError(null)
+          void deleteWorkOrder
+            .mutateAsync(target.id)
+            .then(() => setPendingDelete(null))
+            .catch((error: unknown) => {
+              console.error(error)
+              setPendingDelete(null)
+              setActionError(mapDeleteError(error))
+            })
+        }}
+      />
     </div>
   )
 }

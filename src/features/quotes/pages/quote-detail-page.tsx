@@ -7,6 +7,7 @@ import { QuoteStatusBadge } from '@/features/quotes/components/quote-status-badg
 import { quoteStatusLabelKeys } from '@/features/quotes/quote-status-i18n'
 import {
   getAvailableQuoteTransitions,
+  isQuoteDeletable,
   isQuoteEditable,
   type QuoteStatus,
 } from '@/features/quotes/quote-status'
@@ -227,7 +228,7 @@ export function QuoteDetailPage() {
               {t('quotes.markStatus', { status: t(quoteStatusLabelKeys.rejected) })}
             </Button>
           ) : null}
-          {isQuoteEditable(quote.status) ? (
+          {isQuoteDeletable(quote.status) ? (
             <Button
               variant="destructive"
               className="w-full sm:w-auto"
@@ -267,7 +268,7 @@ export function QuoteDetailPage() {
               {t('quotes.markStatus', { status: t(quoteStatusLabelKeys.rejected) })}
             </Button>
           ) : null}
-          {isQuoteEditable(quote.status) ? (
+          {isQuoteDeletable(quote.status) ? (
             <Button
               variant="destructive"
               className="w-full"

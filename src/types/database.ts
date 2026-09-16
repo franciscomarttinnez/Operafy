@@ -435,6 +435,14 @@ export type Database = {
         Args: Record<string, never>
         Returns: string
       }
+      clear_demo_data: {
+        Args: Record<string, never>
+        Returns: string
+      }
+      wipe_organization_data: {
+        Args: Record<string, never>
+        Returns: string
+      }
     }
     Enums: {
       quote_status: QuoteStatus

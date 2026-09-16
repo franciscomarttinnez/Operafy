@@ -153,12 +153,14 @@ npm install
    - [`supabase/migrations/008_payments.sql`](./supabase/migrations/008_payments.sql)
    - [`supabase/migrations/009_organization_settings.sql`](./supabase/migrations/009_organization_settings.sql)
    - [`supabase/migrations/010_payment_update_and_seed.sql`](./supabase/migrations/010_payment_update_and_seed.sql)
+   - [`supabase/migrations/011_quote_delete_cleanup.sql`](./supabase/migrations/011_quote_delete_cleanup.sql)
+   - [`supabase/migrations/012_clear_demo_and_wipe.sql`](./supabase/migrations/012_clear_demo_and_wipe.sql)
 
    Notes:
 
    - Do not re-run migrations that already succeeded.
    - `002` / `003` live under [`supabase/migrations/_obsolete/`](./supabase/migrations/_obsolete/) and are superseded by `004`.
-   - If the project already has `001`–`009`, run **`010` once** for payment edit + demo seed.
+   - If the project already has `001`–`011`, run **`012` once** for clear-demo + wipe-account RPCs.
 
 3. **Authentication → URL Configuration**, add:
 

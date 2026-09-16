@@ -1,18 +1,38 @@
-import { Plus, Search } from 'lucide-react'
+import { Plus, Search, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import { ConfirmDialog } from '@/components/confirm-dialog'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import { useCustomers } from '@/features/customers/use-customers'
+import { useCustomers, useDeleteCustomer } from '@/features/customers/use-customers'
 import { useDebouncedValue } from '@/hooks/use-debounced-value'
 import { useLocale } from '@/i18n/use-locale'
+import { getErrorMessage } from '@/lib/errors'
 
 export function CustomersListPage() {
   const { t } = useLocale()
   const [searchInput, setSearchInput] = useState('')
   const search = useDebouncedValue(searchInput, 300)
   const customersQuery = useCustomers(search)
+  const deleteCustomer = useDeleteCustomer()
+  const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string } | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
+
+  const mapDeleteError = (error: unknown) => {
+    const message = getErrorMessage(error, t('customers.deleteError'))
+    const lower = message.toLowerCase()
+    if (lower.includes('quote')) {
+      return t('customers.deleteBlockedQuotes')
+    }
+    if (lower.includes('work order') || lower.includes('job')) {
+      return t('customers.deleteBlockedJobs')
+    }
+    if (lower.includes('payment')) {
+      return t('customers.deleteBlockedPayments')
+    }
+    return message
+  }
 
   return (
     <div className="animate-fade-in-up space-y-6">
@@ -45,6 +65,8 @@ export function CustomersListPage() {
           spellCheck={false}
         />
       </div>
+
+      {actionError ? <p className="text-sm text-destructive">{actionError}</p> : null}
 
       {customersQuery.isLoading ? (
         <Card>
@@ -86,13 +108,15 @@ export function CustomersListPage() {
         <>
           <div className="space-y-3 md:hidden">
             {customersQuery.data.map((customer) => (
-              <Link
+              <Card
                 key={customer.id}
-                to={`/customers/${customer.id}`}
-                className="touch-card block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="transition-colors active:bg-accent/50 md:transition-all md:hover:-translate-y-0.5 md:hover:shadow-md"
               >
-                <Card className="transition-colors active:bg-accent/50 md:transition-all md:hover:-translate-y-0.5 md:hover:shadow-md">
-                  <CardContent className="space-y-1 p-4">
+                <CardContent className="space-y-3 p-4">
+                  <Link
+                    to={`/customers/${customer.id}`}
+                    className="touch-card block rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
                     <p className="font-medium text-foreground">{customer.name}</p>
                     <p className="text-sm text-muted-foreground">
                       {customer.phone || customer.email || t('customers.noContact')}
@@ -100,21 +124,36 @@ export function CustomersListPage() {
                     {customer.address ? (
                       <p className="truncate text-xs text-muted-foreground">{customer.address}</p>
                     ) : null}
-                  </CardContent>
-                </Card>
-              </Link>
+                  </Link>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="w-full text-destructive hover:bg-destructive/10 hover:text-destructive"
+                    disabled={deleteCustomer.isPending}
+                    onClick={() => {
+                      setActionError(null)
+                      setPendingDelete({ id: customer.id, name: customer.name })
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    {t('common.delete')}
+                  </Button>
+                </CardContent>
+              </Card>
             ))}
           </div>
 
           <Card className="hidden overflow-hidden md:block">
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[640px] text-left text-sm">
+              <table className="w-full min-w-[720px] text-left text-sm">
                 <thead className="border-b bg-muted/50 text-muted-foreground">
                   <tr>
                     <th className="px-4 py-3 font-medium">{t('customers.name')}</th>
                     <th className="px-4 py-3 font-medium">{t('customers.phone')}</th>
                     <th className="px-4 py-3 font-medium">{t('customers.email')}</th>
                     <th className="px-4 py-3 font-medium">{t('customers.address')}</th>
+                    <th className="px-4 py-3 font-medium">{t('common.delete')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -140,6 +179,22 @@ export function CustomersListPage() {
                       <td className="max-w-xs truncate px-4 py-3 text-muted-foreground">
                         {customer.address ?? t('common.emDash')}
                       </td>
+                      <td className="px-4 py-3">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                          disabled={deleteCustomer.isPending}
+                          onClick={() => {
+                            setActionError(null)
+                            setPendingDelete({ id: customer.id, name: customer.name })
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                          {t('common.delete')}
+                        </Button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -152,8 +207,34 @@ export function CustomersListPage() {
               suffix: search ? t('customers.matchingSearch') : '',
             })}
           </p>
+          <p className="text-xs text-muted-foreground">{t('customers.deleteHint')}</p>
         </>
       ) : null}
+
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        title={t('common.delete')}
+        description={t('customers.deleteConfirm', { name: pendingDelete?.name ?? '' })}
+        confirmLabel={deleteCustomer.isPending ? t('common.deleting') : t('common.delete')}
+        destructive
+        busy={deleteCustomer.isPending}
+        onCancel={() => setPendingDelete(null)}
+        onConfirm={() => {
+          if (!pendingDelete) {
+            return
+          }
+          const target = pendingDelete
+          setActionError(null)
+          void deleteCustomer
+            .mutateAsync(target.id)
+            .then(() => setPendingDelete(null))
+            .catch((error: unknown) => {
+              console.error(error)
+              setPendingDelete(null)
+              setActionError(mapDeleteError(error))
+            })
+        }}
+      />
     </div>
   )
 }

@@ -14,6 +14,7 @@ type FilterChipsProps<T extends string> = {
   options: Array<FilterChipOption<T>>
   label: string
   className?: string
+  children?: ReactNode
 }
 
 export function FilterChips<T extends string>({
@@ -22,6 +23,7 @@ export function FilterChips<T extends string>({
   options,
   label,
   className,
+  children,
 }: FilterChipsProps<T>) {
   return (
     <div
@@ -51,6 +53,7 @@ export function FilterChips<T extends string>({
           </button>
         )
       })}
+      {children}
     </div>
   )
 }
@@ -96,20 +99,14 @@ export function ListFilters<T extends string>({
           spellCheck={false}
         />
       </div>
-      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-        <FilterChips
-          value={filterValue}
-          onChange={onFilterChange}
-          options={filterOptions}
-          label={filterLabel ?? searchLabel}
-          className="sm:flex-1"
-        />
-        {children ? (
-          <div className="scrollbar-none -mx-4 flex gap-2 overflow-x-auto px-4 sm:mx-0 sm:overflow-visible sm:px-0">
-            {children}
-          </div>
-        ) : null}
-      </div>
+      <FilterChips
+        value={filterValue}
+        onChange={onFilterChange}
+        options={filterOptions}
+        label={filterLabel ?? searchLabel}
+      >
+        {children}
+      </FilterChips>
     </div>
   )
 }
